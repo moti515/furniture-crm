@@ -5,8 +5,6 @@ from utils.sheets_service import get_orders_data
 
 st.set_page_config(page_title="Motia Furniture CRM", page_icon="🪑", layout="wide")
 
-MASTER_SPREADSHEET_NAME = "Master_CRM_DB"
-
 # Ініціалізація сесії авторизації
 if "user_profile" not in st.session_state:
   st.session_state.user_profile = None
@@ -20,15 +18,16 @@ if not st.session_state.user_profile:
 
   if st.button("Увійти"):
     if email_input:
-      profile = authenticate_user(email_input, MASTER_SPREADSHEET_NAME)
+      # Викликаємо функцію з одним аргументом (email), як визначено в auth_service.py
+      profile = authenticate_user(email_input)
       if profile:
         st.session_state.user_profile = profile
         st.success(f"Ласкаво просимо, {profile['name']}!")
         st.rerun()
       else:
         st.error(
-            "Email не знайдено або акаунт деактивовано. Зверніться до"
-            " адміністратора."
+            "Email не знайдено в Master_Config або акаунт неактивний. Зверніться"
+            " до адміністратора."
         )
     else:
       st.warning("Будь ласка, введіть Email.")
@@ -49,28 +48,32 @@ else:
   # --- СЕЛЕКТОР БАЗ ДАНИХ (ДЛЯ АДМІНА ТА КОРИСТУВАЧІВ) ---
   db_options = profile["available_databases"]
 
-  if len(db_options) > 1:
-    selected_db_name = st.sidebar.selectbox(
-        "📂 Оберіть базу даних:", list(db_options.keys())
-    )
+  if not db_options:
+    st.error("У вас немає жодної доступної бази даних у Master_Config.")
   else:
-    selected_db_name = list(db_options.keys())[0]
-    st.sidebar.info(f"📂 Активна база: **{selected_db_name}**")
-
-  selected_sheet_id = db_options[selected_db_name]
-
-  # Меню розділів
-  menu = st.sidebar.radio(
-      "Навігація", ["📋 Актуальні замовлення", "➕ Нове замовлення", "👥 Контакти"]
-  )
-
-  st.markdown(f"### Поточний напрямок: **{selected_db_name}**")
-
-  if menu == "📋 Актуальні замовлення":
-    # Підтягуємо дані з обраного Google Sheet ID
-    raw_data = get_orders_data(selected_sheet_id, "Orders")
-    if raw_data:
-      df = pd.DataFrame(raw_data)
-      st.dataframe(df, use_container_width=True)
+    if len(db_options) > 1:
+      selected_db_name = st.sidebar.selectbox(
+          "📂 Оберіть базу даних:", list(db_options.keys())
+      )
     else:
-      st.info("У цій базі замовлення відсутні або аркуш 'Orders' порожній.")
+      selected_db_name = list(db_options.keys())[0]
+      st.sidebar.info(f"📂 Активна база: **{selected_db_name}**")
+
+    selected_sheet_id = db_options[selected_db_name]
+
+    # Меню розділів
+    menu = st.sidebar.radio(
+        "Навігація",
+        ["📋 Актуальні замовлення", "➕ Нове замовлення", "👥 Контакти"],
+    )
+
+    st.markdown(f"### Поточний напрямок: **{selected_db_name}**")
+
+    if menu == "📋 Актуальні замовлення":
+      # Підтягуємо дані з обраного Google Sheet ID користувача/напрямку
+      raw_data = get_orders_data(selected_sheet_id, "Orders")
+      if raw_data:
+        df = pd.DataFrame(raw_data)
+        st.dataframe(df, use_container_width=True)
+      else:
+        st.info("У цій базі замовлення відсутні або аркуш 'Orders' порожній.")
