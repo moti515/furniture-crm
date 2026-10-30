@@ -10,24 +10,15 @@ def get_gspread_client():
   return client
 
 
-def get_orders_data(spreadsheet_name: str, sheet_name: str = "Orders"):
-  """Отримує всі замовлення з таблиці у вигляді списку словників"""
+def get_orders_data(spreadsheet_id: str, sheet_name: str = "Orders"):
+  """Отримує всі рядки з таблиці за її ID у вигляді списку словників"""
   client = get_gspread_client()
   try:
-    sh = client.open(spreadsheet_name)
+    # Використовуємо відкриття за ID, що надійніше, ніж за назвою
+    sh = client.open_by_key(spreadsheet_id)
     worksheet = sh.worksheet(sheet_name)
     data = worksheet.get_all_records()
     return data
   except Exception as e:
-    st.error(f"Помилка підключення до таблиці: {e}")
+    st.error(f"Помилка підключення до таблиці (ID: {spreadsheet_id}): {e}")
     return []
-
-
-def add_order_to_sheet(
-    spreadsheet_name: str, order_data: list, sheet_name: str = "Orders"
-):
-  """Додає новий рядок із замовленням"""
-  client = get_gspread_client()
-  sh = client.open(spreadsheet_name)
-  worksheet = sh.worksheet(sheet_name)
-  worksheet.append_row(order_data)
