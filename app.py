@@ -9,7 +9,7 @@ st.set_page_config(page_title="Motia Furniture CRM", page_icon="🪑", layout="w
 if "user_profile" not in st.session_state:
   st.session_state.user_profile = None
 
-st.title("🪑 Система управління замовленнями (Motia CRM)")
+st.title("🪑 Система управління замовленнями")
 
 # --- БЛОК АВТОРИЗАЦІЇ ---
 if not st.session_state.user_profile:
@@ -57,7 +57,7 @@ else:
       )
     else:
       selected_db_name = list(db_options.keys())[0]
-      st.sidebar.info(f"📂 Активна база: **{selected_db_name}**")
+      st.sidebar.info(f"📂 Активна база:\n\n**{selected_db_name}**")
 
     selected_sheet_id = db_options[selected_db_name]
 
