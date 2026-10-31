@@ -1,9 +1,24 @@
 import pandas as pd
 import streamlit as st
+from streamlit_google_auth import Authenticate
 from utils.auth_service import authenticate_user
 from utils.sheets_service import get_orders_data
 
 st.set_page_config(page_title="Motia Furniture CRM", page_icon="🪑", layout="wide")
+
+# Налаштування об'єкта аутентификації Google з секретів
+auth = Authenticate(
+    secret_credentials_path=None,
+    client_id=st.secrets["google_auth"]["client_id"],
+    client_secret=st.secrets["google_auth"]["client_secret"],
+    redirect_uri=st.secrets["google_auth"]["redirect_uri"],
+    cookie_name="motia_cookie",
+    cookie_key="motia_secret_key",
+    cookie_expiry_days=30,
+)
+
+# Перевірка стану входу
+auth.check_authorization()
 
 # Ініціалізація сесії авторизації
 if "user_profile" not in st.session_state:
@@ -11,40 +26,56 @@ if "user_profile" not in st.session_state:
 
 st.title("🪑 Система управління замовленнями")
 
-# --- БЛОК АВТОРИЗАЦІЇ ---
-if not st.session_state.user_profile:
-  st.subheader("🔑 Вхід у систему")
-  email_input = st.text_input("Введіть ваш Email для входу:")
+# --- БЛОК АВТОРИЗАЦІЇ ЧЕРЕЗ GOOGLE ---
+if not auth.logged_in:
+  st.subheader("🔑 Будь ласка, увійдіть за допомогою Google-акаунта")
+  # Рендеримо кнопку входу Google
+  auth.login_button(button_text="Увійти через Google")
 
-  if st.button("Увійти"):
-    if email_input:
-      # Викликаємо функцію з одним аргументом (email), як визначено в auth_service.py
-      profile = authenticate_user(email_input)
-      if profile:
-        st.session_state.user_profile = profile
-        st.success(f"Ласкаво просимо, {profile['name']}!")
-        st.rerun()
-      else:
-        st.error(
-            "Email не знайдено в Master_Config або акаунт неактивний. Зверніться"
-            " до адміністратора."
-        )
-    else:
-      st.warning("Будь ласка, введіть Email.")
+  st.info(
+      "Доступ мають лише авторизовані користувачі, чиї поштові адреси зареєстровані"
+      " в системі адміністратором."
+  )
 
-# --- ОСНОВНИЙ ІНТЕРФЕЙС CRM (ПІСЛЯ ВХОДУ) ---
 else:
+  # Отримуємо дані користувача, який щойно успішно авторизувався через Google
+  user_info = auth.get_user_info()
+  google_email = user_info.get("email")
+
+  # Перевіряємо пошту в нашому Master_Config
+  if not st.session_state.user_profile:
+    profile = authenticate_user(google_email)
+    if profile:
+      st.session_state.user_profile = profile
+      st.rerun()
+    else:
+      st.error(
+          f"Пошту ({google_email}) не знайдено в Master_Config або акаунт"
+          " неактивний. Зверніться до адміністратора."
+      )
+      if st.button("Вийти"):
+        auth.logout()
+        st.rerun()
+      st.stop()
+
+  # --- ОСНОВНИЙ ІНТЕРФЕЙС CRM (ПІСЛЯ УСПІШНОГО ВХОДУ) ---
   profile = st.session_state.user_profile
 
   # Бокова панель (Сайдбар)
-  st.sidebar.write(f"👤 **{profile['name']}** ({profile['role']})")
+  st.sidebar.image(
+      user_info.get("picture"), width=50
+  )  # Аватарка з Google
+  st.sidebar.write(
+      f"👤 **{profile['name']}**\n\n✉️ `{google_email}`\n\nРоль: `{profile['role']}`"
+  )
 
   if st.sidebar.button("Вийти"):
+    auth.logout()
     st.session_state.user_profile = None
     st.rerun()
 
   st.sidebar.markdown("---")
-
+  
   # --- СЕЛЕКТОР БАЗ ДАНИХ (ДЛЯ АДМІНА ТА КОРИСТУВАЧІВ) ---
   db_options = profile["available_databases"]
 
