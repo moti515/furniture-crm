@@ -18,23 +18,20 @@ def get_master_config() -> pd.DataFrame:
 
 
 def authenticate_user(email: str) -> dict | None:
-  """Шукає користувача за email у Master_Config та формує список доступних йому баз.
-
-  Якщо ID бази даних порожній або відсутній, рядок ігнорується.
-  """
+  """Шукає користувача в Master_Config та повертає профіль із доступними базами та їх папка на Диску."""
   df_config = get_master_config()
 
   if df_config.empty:
     st.error("Неможливо завантажити Master_Config або аркуш порожній.")
     return None
 
-  # Нормалізація колонок та email для коректної перевірки
+  # Нормалізація колонок
   df_config["Email користувача"] = (
       df_config["Email користувача"].astype(str).str.strip().str.lower()
   )
   clean_email = email.strip().lower()
 
-  # Фільтруємо тільки ті рядки, де реально прописаний ID бази даних (не NaN і не пустий рядок)
+  # Залишаємо тільки рядки, де реалізовано валідний ID бази даних
   df_config = df_config.dropna(subset=["ID бази даних"])
   df_config = df_config[df_config["ID бази даних"].astype(str).str.strip() != ""]
 
@@ -43,27 +40,23 @@ def authenticate_user(email: str) -> dict | None:
   if user_rows.empty:
     return None
 
-  # Визначаємо роль за першим знайденим рядком користувача
   first_row = user_rows.iloc[0].to_dict()
   role = str(first_row.get("Роль", "user")).strip().lower()
 
-  # Формування доступних баз даних (тільки з валідними ID)
-  if role == "admin":
-    # Адмін має доступ до ВСІХ валідних баз, зареєстрованих у Master_Config
-    available_databases = (
-        df_config[["Ім'я / Напрямок", "ID бази даних"]]
-        .drop_duplicates(subset=["Ім'я / Напрямок"])
-        .set_index("Ім'я / Напрямок")["ID бази даних"]
-        .to_dict()
-    )
-  else:
-    # Звичайний користувач отримує тільки ті свої бази, де заповнений ID
-    available_databases = (
-        user_rows[["Ім'я / Напрямок", "ID бази даних"]]
-        .drop_duplicates(subset=["Ім'я / Напрямок"])
-        .set_index("Ім'я / Напрямок")["ID бази даних"]
-        .to_dict()
-    )
+  # Формуємо словник доступних баз: { "Назва напрямку": { "sheet_id": "...", "drive_folder_id": "..." } }
+  target_df = df_config if role == "admin" else user_rows
+
+  available_databases = {}
+  for _, row in target_df.iterrows():
+    db_name = str(row.get("Ім'я / Напрямок", "Без назви")).strip()
+    sheet_id = str(row.get("ID бази даних", "")).strip()
+    drive_folder_id = str(row.get("ID папки Google Drive", "")).strip()
+
+    if sheet_id:
+      available_databases[db_name] = {
+          "sheet_id": sheet_id,
+          "drive_folder_id": drive_folder_id,
+      }
 
   return {
       "user_id": first_row.get("User_ID"),
