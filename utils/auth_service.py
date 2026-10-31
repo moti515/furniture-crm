@@ -14,13 +14,14 @@ def get_master_config() -> pd.DataFrame:
 
 
 def authenticate_user(email: str) -> dict | None:
-  """Шукає користувача за email у Master_Config та формує доступні йому бази."""
+  """Шукає користувача за email у Master_Config та формує список доступних йому баз."""
   df_config = get_master_config()
 
   if df_config.empty:
     st.error("Неможливо завантажити Master_Config або аркуш порожній.")
     return None
 
+  # Нормалізація колонок та email для коректної перевірки
   df_config["Email користувача"] = (
       df_config["Email користувача"].astype(str).str.strip().str.lower()
   )
@@ -31,20 +32,26 @@ def authenticate_user(email: str) -> dict | None:
   if user_rows.empty:
     return None
 
+  # Визначаємо роль за першим знайденим рядком користувача
   first_row = user_rows.iloc[0].to_dict()
   role = str(first_row.get("Роль", "user")).strip().lower()
 
+  # Формування доступних баз даних
   if role == "admin":
+    # Адмін має доступ до ВСІХ баз, зареєстрованих у Master_Config
     available_databases = (
         df_config[["Ім'я / Напрямок", "ID бази даних"]]
         .dropna(subset=["ID бази даних"])
+        .drop_duplicates(subset=["Ім'я / Напрямок"])
         .set_index("Ім'я / Напрямок")["ID бази даних"]
         .to_dict()
     )
   else:
+    # Звичайний користувач отримує всі бази, які прописані для нього в рядках Master_Config
     available_databases = (
         user_rows[["Ім'я / Напрямок", "ID бази даних"]]
         .dropna(subset=["ID бази даних"])
+        .drop_duplicates(subset=["Ім'я / Напрямок"])
         .set_index("Ім'я / Напрямок")["ID бази даних"]
         .to_dict()
     )
