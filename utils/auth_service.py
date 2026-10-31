@@ -18,7 +18,7 @@ def get_master_config() -> pd.DataFrame:
 
 
 def authenticate_user(email: str) -> dict | None:
-  """Шукає користувача в Master_Config та повертає профіль із доступними базами та їх папка на Диску."""
+  """Шукає користувача в Master_Config та формує список доступних йому баз."""
   df_config = get_master_config()
 
   if df_config.empty:
@@ -31,10 +31,7 @@ def authenticate_user(email: str) -> dict | None:
   )
   clean_email = email.strip().lower()
 
-  # Залишаємо тільки рядки, де реалізовано валідний ID бази даних
-  df_config = df_config.dropna(subset=["ID бази даних"])
-  df_config = df_config[df_config["ID бази даних"].astype(str).str.strip() != ""]
-
+  # 1. Спочатку шукаємо самого користувача в повному конфізі
   user_rows = df_config[df_config["Email користувача"] == clean_email]
 
   if user_rows.empty:
@@ -43,20 +40,36 @@ def authenticate_user(email: str) -> dict | None:
   first_row = user_rows.iloc[0].to_dict()
   role = str(first_row.get("Роль", "user")).strip().lower()
 
-  # Формуємо словник доступних баз: { "Назва напрямку": { "sheet_id": "...", "drive_folder_id": "..." } }
-  target_df = df_config if role == "admin" else user_rows
+  # 2. Окремо фільтруємо тільки ті рядки, де реально прописаний валідний ID бази даних
+  valid_df = df_config.dropna(subset=["ID бази даних"])
+  valid_df = valid_df[valid_df["ID бази даних"].astype(str).str.strip() != ""]
 
   available_databases = {}
-  for _, row in target_df.iterrows():
-    db_name = str(row.get("Ім'я / Напрямок", "Без назви")).strip()
-    sheet_id = str(row.get("ID бази даних", "")).strip()
-    drive_folder_id = str(row.get("ID папки Google Drive", "")).strip()
 
-    if sheet_id:
-      available_databases[db_name] = {
-          "sheet_id": sheet_id,
-          "drive_folder_id": drive_folder_id,
-      }
+  # 3. Формуємо список баз залежно від ролі
+  if role == "admin":
+    # Адмін бачить ВСІ валідні бази, зареєстровані в Master_Config
+    for _, row in valid_df.iterrows():
+      db_name = str(row.get("Ім'я / Напрямок", "Без назви")).strip()
+      sheet_id = str(row.get("ID бази даних", "")).strip()
+      drive_folder_id = str(row.get("ID папки Google Drive", "")).strip()
+      if sheet_id:
+        available_databases[db_name] = {
+            "sheet_id": sheet_id,
+            "drive_folder_id": drive_folder_id,
+        }
+  else:
+    # Звичайний користувач бачить тільки свої рядки, де заповнений ID бази
+    user_valid_rows = valid_df[valid_df["Email користувача"] == clean_email]
+    for _, row in user_valid_rows.iterrows():
+      db_name = str(row.get("Ім'я / Напрямок", "Без назви")).strip()
+      sheet_id = str(row.get("ID бази даних", "")).strip()
+      drive_folder_id = str(row.get("ID папки Google Drive", "")).strip()
+      if sheet_id:
+        available_databases[db_name] = {
+            "sheet_id": sheet_id,
+            "drive_folder_id": drive_folder_id,
+        }
 
   return {
       "user_id": first_row.get("User_ID"),
