@@ -3,8 +3,9 @@ import streamlit as st
 from utils.sheets_service import get_orders_data
 
 
+@st.cache_data(ttl=300)
 def get_master_config() -> pd.DataFrame:
-  """Зчитує конфігураційний аркуш Master_Config із головної таблиці"""
+  """Зчитує конфігураційний аркуш Master_Config із кешуванням на 5 хвилин"""
   master_id = st.secrets["MASTER_SHEET_ID"]
   raw_config = get_orders_data(master_id, "Master_Config")
   if raw_config:
@@ -20,7 +21,6 @@ def authenticate_user(email: str) -> dict | None:
     st.error("Неможливо завантажити Master_Config або аркуш порожній.")
     return None
 
-  # Нормалізація email для коректної перевірки
   df_config["Email користувача"] = (
       df_config["Email користувача"].astype(str).str.strip().str.lower()
   )
@@ -34,9 +34,7 @@ def authenticate_user(email: str) -> dict | None:
   first_row = user_rows.iloc[0].to_dict()
   role = str(first_row.get("Роль", "user")).strip().lower()
 
-  # Формування доступних баз залежно від ролі
   if role == "admin":
-    # Адмін бачить усі напрямки/бази, зареєстровані в Master_Config
     available_databases = (
         df_config[["Ім'я / Напрямок", "ID бази даних"]]
         .dropna(subset=["ID бази даних"])
@@ -44,7 +42,6 @@ def authenticate_user(email: str) -> dict | None:
         .to_dict()
     )
   else:
-    # Звичайний користувач бачить тільки свої напрямки (якщо їх кілька в таблиці)
     available_databases = (
         user_rows[["Ім'я / Напрямок", "ID бази даних"]]
         .dropna(subset=["ID бази даних"])
