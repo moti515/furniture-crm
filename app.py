@@ -41,11 +41,16 @@ st.sidebar.button("🚪 Вийти з акаунта", on_click=st.logout)
 st.sidebar.markdown("---")
 
 # --- СЕЛЕКТОР БАЗ ДАНИХ ---
-db_options = profile["available_databases"]
+db_options = profile.get("available_databases", {})
 
 if not db_options:
-  st.error("У вас немає жодної доступної бази даних у Master_Config.")
+  st.warning(
+      "⚠️ Для вашого акаунта не прописано жодної доступної бази даних у"
+      " Master_Config."
+  )
+  st.info("💡 Зверніться до адміністратора для налаштування доступу.")
 else:
+  # Якщо баз кілька — виводимо випадаючий список
   if len(db_options) > 1:
     selected_db_name = st.sidebar.selectbox(
         "📂 Оберіть базу даних:", list(db_options.keys())
