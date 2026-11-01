@@ -12,10 +12,10 @@ st.title("🪑 Система управління замовленнями")
 
 # 1. Перевірка нативної авторизації Streamlit
 if not st.user.is_logged_in:
-  st.subheader("🔑 Будь ласка, увійдіть за допомогою Google-акаунта")
-  st.info("Доступ мають лише користувачі, зареєстровані в Master_Config.")
-  st.button("🔑 Увійти через Google", on_click=st.login)
-  st.stop()
+    st.subheader("🔑 Будь ласка, увійдіть за допомогою Google-акаунта")
+    st.info("Доступ мають лише користувачі, зареєстровані в Master_Config.")
+    st.button("🔑 Увійти через Google", on_click=st.login)
+    st.stop()
 
 # 2. Отримуємо підтверджену пошту Google
 google_email = st.user.email
@@ -25,13 +25,12 @@ user_name = st.user.name or google_email
 profile = authenticate_user(google_email)
 
 if not profile:
-  st.error(
-      f"⛔ Пошту (`{google_email}`) не знайдено в Master_Config або акаунт"
-      " неактивний."
-  )
-  st.info("💡 Зверніться до адміністратора для отримання доступу.")
-  st.button("🚪 Вийти з акаунта", on_click=st.logout)
-  st.stop()
+    st.error(
+        f"⛔ Пошту (`{google_email}`) не знайдено в Master_Config або акаунт неактивний."
+    )
+    st.info("💡 Зверніться до адміністратора для отримання доступу.")
+    st.button("🚪 Вийти з акаунта", on_click=st.logout)
+    st.stop()
 
 # --- ОСНОВНИЙ ІНТЕРФЕЙС CRM (ПІСЛЯ ВХОДУ) ---
 st.sidebar.write(
@@ -45,31 +44,30 @@ st.sidebar.markdown("---")
 db_options = profile.get("available_databases", {})
 
 if not db_options:
-  st.warning(
-      "⚠️ Для вашого акаунта не прописано жодної доступної бази даних у"
-      " Master_Config."
-  )
-  st.info("💡 Зверніться до адміністратора для налаштування доступу.")
-else:
-  # Якщо баз кілька — виводимо випадаючий список
-  if len(db_options) > 1:
-    selected_db_name = st.sidebar.selectbox(
-        "📂 Оберіть базу даних:", list(db_options.keys())
+    st.warning(
+        "⚠️ Для вашого акаунта не прописано жодної доступної бази даних у Master_Config."
     )
-  else:
-    selected_db_name = list(db_options.keys())[0]
-    st.sidebar.info(f"📂 Активна база:\n\n**{selected_db_name}**")
+    st.info("💡 Зверніться до адміністратора для налаштування доступу.")
+else:
+    # Якщо баз кілька — виводимо випадаючий список
+    if len(db_options) > 1:
+        selected_db_name = st.sidebar.selectbox(
+            "📂 Оберіть базу даних:", list(db_options.keys())
+        )
+    else:
+        selected_db_name = list(db_options.keys())[0]
+        st.sidebar.info(f"📂 Активна база:\n\n**{selected_db_name}**")
 
-  selected_sheet_id = db_options[selected_db_name]
+    selected_sheet_id = db_options[selected_db_name]
 
-  menu = st.sidebar.radio(
-      "Навігація",
-      ["📋 Актуальні замовлення", "➕ Нове замовлення", "👥 Контакти"],
-  )
+    menu = st.sidebar.radio(
+        "Навігація",
+        ["📋 Актуальні замовлення", "➕ Нове замовлення", "👥 Контакти"],
+    )
 
-  st.markdown(f"### Поточний напрямок: **{selected_db_name}**")
+    st.markdown(f"### Поточний напрямок: **{selected_db_name}**")
 
-  # --- МЕНЮ ТА РОУТИНГ ---
+    # --- МЕНЮ ТА РОУТИНГ ---
     if menu == "📋 Актуальні замовлення":
         raw_data = get_orders_data(selected_sheet_id, "Orders")
         if raw_data:
@@ -79,7 +77,6 @@ else:
             st.info("У цій базі замовлення відсутні або аркуш 'Orders' порожній.")
 
     elif menu == "➕ Нове замовлення":
-        # Отримуємо drive_folder_id напрямку з об'єкта профілю користувача
         drive_folder_id = profile.get("available_databases", {}).get(
             selected_db_name, ""
         )
