@@ -2,6 +2,7 @@ import pandas as pd
 import streamlit as st
 from utils.auth_service import authenticate_user
 from utils.sheets_service import get_orders_data
+from views.new_order import render_new_order_view
 
 st.set_page_config(
     page_title="Motia Furniture CRM", page_icon="🪑", layout="wide"
@@ -68,10 +69,21 @@ else:
 
   st.markdown(f"### Поточний напрямок: **{selected_db_name}**")
 
-  if menu == "📋 Актуальні замовлення":
-    raw_data = get_orders_data(selected_sheet_id, "Orders")
-    if raw_data:
-      df = pd.DataFrame(raw_data)
-      st.dataframe(df, use_container_width=True)
-    else:
-      st.info("У цій базі замовлення відсутні або аркуш 'Orders' порожній.")
+  # --- МЕНЮ ТА РОУТИНГ ---
+    if menu == "📋 Актуальні замовлення":
+        raw_data = get_orders_data(selected_sheet_id, "Orders")
+        if raw_data:
+            df = pd.DataFrame(raw_data)
+            st.dataframe(df, use_container_width=True)
+        else:
+            st.info("У цій базі замовлення відсутні або аркуш 'Orders' порожній.")
+
+    elif menu == "➕ Нове замовлення":
+        # Отримуємо drive_folder_id напрямку з об'єкта профілю користувача
+        drive_folder_id = profile.get("available_databases", {}).get(
+            selected_db_name, ""
+        )
+        render_new_order_view(selected_sheet_id, drive_folder_id)
+
+    elif menu == "👥 Контакти":
+        st.info("Розділ довідника контактів знаходиться в розробці.")
