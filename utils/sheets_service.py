@@ -18,7 +18,7 @@ def get_orders_data(spreadsheet_id: str, sheet_name: str = "Orders"):
     worksheet = sh.worksheet(sheet_name)
     return worksheet.get_all_records()
   except Exception as e:
-    st.error(f"Помилка підключення до аркуша '{sheet_name}' (ID: {spreadsheet_id}): {e}")
+    st.warning(f"⚠️ Аркуш 'Contacts' не знайдено або він порожній: {e}")
     return []
 
 
