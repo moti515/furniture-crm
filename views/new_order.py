@@ -17,12 +17,12 @@ def render_new_order_view(selected_sheet_id, drive_folder_id):
 
   # Отримуємо актуальний список контактів з бази
   contacts = get_contacts_list(selected_sheet_id)
-  
+
   # Допоміжна функція для вибору контакту з можливістю швидкого додавання нового
   def contact_selector_with_add(label, key_suffix, default_role=""):
     options = [""] + contacts + ["➕ Додати новий контакт..."]
     selected = st.selectbox(label, options=options, key=f"sel_{key_suffix}")
-    
+
     if selected == "➕ Додати новий контакт...":
       st.markdown(f"**📝 Додавання нового контакту ({label})**")
       with st.expander(f"Форма нового контакту ({label})", expanded=True):
@@ -65,65 +65,45 @@ def render_new_order_view(selected_sheet_id, drive_folder_id):
 
   with st.form("new_order_form"):
     st.markdown("### 📌 Основна інформація")
+    
     col1, col2 = st.columns(2)
-
     with col1:
       customer = contact_selector_with_add("Замовник / Представник *", "customer", "Замовник")
       order_name = st.text_input(
           "Назва замовлення *",
           placeholder="Напр., Кухня фасади МДФ фарбовані",
       )
+    with col2:
       order_content = st.text_area(
           "Суть/Зміст замовлення",
           placeholder="Детальний опис того, що саме необхідно зробити...",
-      )
-      order_type = st.multiselect(
-          "Тип замовлення",
-          options=[
-              "Повний цикл",
-              "Монтаж",
-              "Готові вироби",
-              "Сервіс і ремонт",
-              "Проєкт",
-          ],
+          height=105
       )
 
-    with col2:
-      # --- ЛОГІКА ІЄРАРХІЇ КРАЇНА -> МІСТО -> ОБ'ЄКТ ---
+    st.markdown("---")
+    st.markdown("### 📍 Локація та адреса виконання замовлення")
+    
+    loc_col1, loc_col2, loc_col3 = st.columns(3)
+    with loc_col1:
       countries = list(hierarchy.keys()) + ["Інше"]
       selected_country = st.selectbox("Країна", options=countries)
-
-      if selected_country == "Інше":
-        country_input = st.text_input("Введіть назву нової країни")
-        cities = ["Інше"]
-      else:
-        country_input = selected_country
-        cities = list(hierarchy.get(selected_country, {}).keys()) + ["Інше"]
-
+    with loc_col2:
+      cities = list(hierarchy.get(selected_country, {}).keys()) + ["Інше"] if selected_country != "Інше" else ["Інше"]
       selected_city = st.selectbox("Місто / Ort", options=cities)
-
-      if selected_city == "Інше":
-        city_input = st.text_input("Введіть назву нового міста")
-        objects = ["Інше"]
-      else:
-        city_input = selected_city
-        objects = (
-            hierarchy.get(selected_country, {}).get(selected_city, [])
-            + ["Інше"]
-        )
-
+    with loc_col3:
+      objects = (
+          hierarchy.get(selected_country, {}).get(selected_city, []) + ["Інше"]
+          if selected_country != "Інше" and selected_city != "Інше"
+          else ["Інше"]
+      )
       selected_object = st.selectbox("Назва об'єкта", options=objects)
 
-      if selected_object == "Інше":
-        object_input = st.text_input("Введіть назву нового об'єкта")
-      else:
-        object_input = selected_object
-
     address = st.text_area(
-        "Точна адреса монтажу",
+        "Адреса виконання замовлення",
         placeholder=(
-            "Вулиця, будинок, квартира...\n💡 Підказка: якщо вище обрано"
-            " 'Інше', вкажіть деталі тут."
+            "Вулиця, будинок, квартира...\n💡 Підказка: якщо вище не вказано"
+            " точну країну, місто чи об'єкт (обрано 'Інше'), обов'язково вкажіть їх тут"
+            " та нагадайте адміністратору про необхідність коригування."
         ),
     )
 
@@ -140,6 +120,71 @@ def render_new_order_view(selected_sheet_id, drive_folder_id):
       installer = contact_selector_with_add("Монтажник", "installer", "Монтажник")
       other_persons = st.text_input("Інші пов'язані особи")
 
+    st.markdown("---")
+    st.markdown("### ⚙️ Типи замовлення та етапи конвеєра")
+    
+    t_col1, t_col2, t_col3 = st.columns(3)
+    with t_col1:
+      chk_measuring = st.checkbox("Заміри")
+      chk_design = st.checkbox("Розробка дизайну")
+    with t_col2:
+      chk_constructor = st.checkbox("Розробка конструктиву")
+      chk_production = st.checkbox("Виготовлення")
+    with t_col3:
+      chk_installation = st.checkbox("Монтаж")
+      chk_delivery_goods = st.checkbox("Поставка готових виробів і фурнітури")
+    
+    chk_service = st.checkbox("Сервіс і Ремонт")
+
+    # Збираємо список активних типів замовлення для запису в комірку
+    active_types = []
+    if chk_measuring: active_types.append("Заміри")
+    if chk_design: active_types.append("Розробка дизайну")
+    if chk_constructor: active_types.append("Розробка конструктиву")
+    if chk_production: active_types.append("Виготовлення")
+    if chk_installation: active_types.append("Монтаж")
+    if chk_delivery_goods: active_types.append("Поставка готових виробів і фурнітури")
+    if chk_service: active_types.append("Сервіс і Ремонт")
+
+    # Динамічні поля статусів і коментарів на основі вибраних чекбоксів
+    order_payload_extras = {}
+
+    if chk_measuring:
+      st.markdown("📐 **Етап: Заміри**")
+      mc1, mc2 = st.columns(2)
+      with mc1: order_payload_extras["Заміри статус"] = st.selectbox("Заміри статус", ["в роботі", "перевіряються", "готово"], key="s_meas")
+      with mc2: order_payload_extras["Заміри коментар"] = st.text_input("Заміри коментар", key="c_meas")
+
+    if chk_design:
+      st.markdown("🎨 **Етап: Розробка дизайну**")
+      dc1, dc2 = st.columns(2)
+      with dc1: order_payload_extras["Дизайн статус"] = st.selectbox("Дизайн статус", ["в роботі", "перевіряються", "на погодженні", "готово"], key="s_des")
+      with dc2: order_payload_extras["Дизайн коментар"] = st.text_input("Дизайн коментар", key="c_des")
+
+    if chk_constructor:
+      st.markdown("🛠 **Етап: Розробка конструктиву**")
+      cc1, cc2 = st.columns(2)
+      with cc1: order_payload_extras["Конструктив статус"] = st.selectbox("Конструктив статус", ["в роботі", "перевіряються", "готово"], key="s_con")
+      with cc2: order_payload_extras["Конструктив коментар"] = st.text_input("Конструктив коментар", key="c_con")
+
+    if chk_production:
+      st.markdown("🏭 **Етап: Виготовлення**")
+      pc1, pc2 = st.columns(2)
+      with pc1: order_payload_extras["Виробництво статус"] = st.selectbox("Виробництво статус", ["в роботі", "перевіряються", "готово"], key="s_prod")
+      with pc2: order_payload_extras["Виробництво коментар"] = st.text_input("Виробництво коментар", key="c_prod")
+
+    if chk_installation or chk_service:
+      st.markdown("🔧 **Етап: Монтаж**")
+      ic1, ic2 = st.columns(2)
+      with ic1: order_payload_extras["Монтаж статус"] = st.selectbox("Монтаж статус", ["в роботі", "перевіряються", "готово"], key="s_inst")
+      with ic2: order_payload_extras["Монтаж коментар"] = st.text_input("Монтаж коментар", key="c_inst")
+
+    if chk_production or chk_installation or chk_delivery_goods:
+      st.markdown("🚚 **Етап: Доставка**")
+      doc1, doc2 = st.columns(2)
+      with doc1: order_payload_extras["Доставка статус"] = st.selectbox("Доставка статус", ["відвантажено", "розвантаження", "готово"], key="s_del")
+      with doc2: order_payload_extras["Доставка коментар"] = st.text_input("Доставка коментар", key="c_del")
+
     submitted = st.form_submit_button(
         "💾 Зберегти замовлення та створити папки на Диску"
     )
@@ -147,25 +192,17 @@ def render_new_order_view(selected_sheet_id, drive_folder_id):
     if submitted:
       if not order_name or not customer:
         st.error(
-            "❌ Будь ласка, заповніть обов'язкові поля: Замовник та Назва"
-            " замовлення."
+            "❌ Будь ласка, заповніть обов'язкові поля: Замовник та Назва замовлення."
         )
       else:
         with st.spinner(
             "Створення папок на Google Диску та збереження даних..."
         ):
           try:
-            final_country = (
-                country_input
-                if selected_country == "Інше"
-                else selected_country
-            )
-            final_city = (
-                city_input if selected_city == "Інше" else selected_city
-            )
-            final_object = (
-                object_input if selected_object == "Інше" else selected_object
-            )
+            # Якщо вибрано "Інше", передаємо це значення у структуру папок (створиться папка "Інше")
+            final_country = selected_country
+            final_city = selected_city
+            final_object = selected_object
 
             temp_folder_name = f"Нове замовлення - {order_name}"
 
@@ -177,7 +214,7 @@ def render_new_order_view(selected_sheet_id, drive_folder_id):
                 temp_folder_name,
             )
 
-            # Дані для збереження в таблицю Orders (з урахуванням нової колонки Суть/Зміст замовлення)
+            # Формуємо словник даних для запису в Orders
             order_payload = {
                 "Замовник / Представник": customer,
                 "Країна": final_country,
@@ -186,7 +223,7 @@ def render_new_order_view(selected_sheet_id, drive_folder_id):
                 "Адреса": address,
                 "Назва замовлення": order_name,
                 "Суть/Зміст замовлення": order_content,
-                "Тип замовлення": ", ".join(order_type),
+                "Тип замовлення": ", ".join(active_types),
                 "Замірник": measurer,
                 "Дизайнер": designer,
                 "Конструктор": constructor,
@@ -195,6 +232,9 @@ def render_new_order_view(selected_sheet_id, drive_folder_id):
                 "Інші пов'язані особи": other_persons,
                 "Папка на Диску": folder_link,
             }
+
+            # Додаємо статусні поля і коментарі, які були активовані через чекбокси
+            order_payload.update(order_payload_extras)
 
             new_id = save_new_order(selected_sheet_id, order_payload)
 
