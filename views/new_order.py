@@ -1,28 +1,61 @@
+from datetime import datetime
 import pandas as pd
 import streamlit as st
 from utils.drive_service import (
     create_order_folder_structure,
     get_drive_hierarchy,
 )
-from utils.sheets_service import get_contacts_list, save_new_order
+from utils.sheets_service import (
+    get_contacts_list,
+    save_new_order,
+    save_new_contact,
+)
 
 
 def render_new_order_view(selected_sheet_id, drive_folder_id):
   st.subheader("➕ Створення нового замовлення")
 
-  # 1. Перевірка наявності контактів
+  # Отримуємо актуальний список контактів з бази
   contacts = get_contacts_list(selected_sheet_id)
-  if not contacts:
-    st.warning(
-        "⚠️ У базі ще немає жодного контакту. Будь ласка, додайте замовника в"
-        " розділі '👥 Контакти'."
-    )
-    if st.button(" перейти до Контактів"):
-      st.session_state["navigation"] = "👥 Контакти"
-      st.rerun()
-    return
+  
+  # Допоміжна функція для вибору контакту з можливістю швидкого додавання нового
+  def contact_selector_with_add(label, key_suffix, default_role=""):
+    options = [""] + contacts + ["➕ Додати новий контакт..."]
+    selected = st.selectbox(label, options=options, key=f"sel_{key_suffix}")
+    
+    if selected == "➕ Додати новий контакт...":
+      st.markdown(f"**📝 Додавання нового контакту ({label})**")
+      with st.expander(f"Форма нового контакту ({label})", expanded=True):
+        new_name = st.text_input("ПІБ / Назва *", key=f"new_name_{key_suffix}")
+        col_a, col_b = st.columns(2)
+        with col_a:
+          new_phone = st.text_input("Телефон", key=f"new_phone_{key_suffix}")
+          new_email = st.text_input("Email", key=f"new_email_{key_suffix}")
+        with col_b:
+          new_role = st.text_input("Роль / Категорія", value=default_role, key=f"new_role_{key_suffix}")
+          new_comment = st.text_input("Коментар", key=f"new_com_{key_suffix}")
 
-  # 2. Отримання ієрархії папок з Google Drive
+        if st.button("💾 Зберегти контакт", key=f"btn_save_contact_{key_suffix}"):
+          if not new_name:
+            st.error("❌ Введіть ПІБ або назву контакту.")
+          else:
+            contact_data = {
+                "ПІБ / Назва": new_name,
+                "Роль / Категорія": new_role,
+                "Телефон(и)": new_phone,
+                "Email(и)": new_email,
+                "Коментар": new_comment,
+            }
+            success = save_new_contact(selected_sheet_id, contact_data)
+            if success:
+              st.success(f"✅ Контакт '{new_name}' успішно додано!")
+              st.rerun()
+            else:
+              st.error("❌ Помилка збереження контакту.")
+      return ""
+    return selected
+
+  # Завантаження ієрархії папок з Google Drive
   with st.spinner("Завантаження ієрархії папок з Google Диску..."):
     try:
       hierarchy, _ = get_drive_hierarchy(drive_folder_id)
@@ -35,14 +68,14 @@ def render_new_order_view(selected_sheet_id, drive_folder_id):
     col1, col2 = st.columns(2)
 
     with col1:
-      customer = st.selectbox(
-          "Замовник / Представник *",
-          options=contacts,
-          help="Оберіть особу з довідника контактів",
-      )
+      customer = contact_selector_with_add("Замовник / Представник *", "customer", "Замовник")
       order_name = st.text_input(
           "Назва замовлення *",
           placeholder="Напр., Кухня фасади МДФ фарбовані",
+      )
+      order_content = st.text_area(
+          "Суть/Зміст замовлення",
+          placeholder="Детальний опис того, що саме необхідно зробити...",
       )
       order_type = st.multiselect(
           "Тип замовлення",
@@ -98,13 +131,13 @@ def render_new_order_view(selected_sheet_id, drive_folder_id):
     st.markdown("### 👥 Відповідальні особи")
     col3, col4, col5 = st.columns(3)
     with col3:
-      measurer = st.selectbox("Замірник", options=[""] + contacts)
-      designer = st.selectbox("Дизайнер", options=[""] + contacts)
+      measurer = contact_selector_with_add("Замірник", "measurer", "Замірник")
+      designer = contact_selector_with_add("Дизайнер", "designer", "Дизайнер")
     with col4:
-      constructor = st.selectbox("Конструктор", options=[""] + contacts)
-      producer = st.selectbox("Виробник", options=[""] + contacts)
+      constructor = contact_selector_with_add("Конструктор", "constructor", "Конструктор")
+      producer = contact_selector_with_add("Виробник", "producer", "Виробник")
     with col5:
-      installer = st.selectbox("Монтажник", options=[""] + contacts)
+      installer = contact_selector_with_add("Монтажник", "installer", "Монтажник")
       other_persons = st.text_input("Інші пов'язані особи")
 
     submitted = st.form_submit_button(
@@ -122,7 +155,6 @@ def render_new_order_view(selected_sheet_id, drive_folder_id):
             "Створення папок на Google Диску та збереження даних..."
         ):
           try:
-            # Визначаємо фінальні назви для папок з урахуванням 'Інше'
             final_country = (
                 country_input
                 if selected_country == "Інше"
@@ -135,10 +167,8 @@ def render_new_order_view(selected_sheet_id, drive_folder_id):
                 object_input if selected_object == "Інше" else selected_object
             )
 
-            # Формуємо тимчасове ID або назву для папки замовлення
             temp_folder_name = f"Нове замовлення - {order_name}"
 
-            # Створюємо структуру папок на Диску
             folder_link = create_order_folder_structure(
                 drive_folder_id,
                 final_country,
@@ -147,7 +177,7 @@ def render_new_order_view(selected_sheet_id, drive_folder_id):
                 temp_folder_name,
             )
 
-            # Дані для збереження в таблицю Orders
+            # Дані для збереження в таблицю Orders (з урахуванням нової колонки Суть/Зміст замовлення)
             order_payload = {
                 "Замовник / Представник": customer,
                 "Країна": final_country,
@@ -155,6 +185,7 @@ def render_new_order_view(selected_sheet_id, drive_folder_id):
                 "Назва об'єкта": final_object,
                 "Адреса": address,
                 "Назва замовлення": order_name,
+                "Суть/Зміст замовлення": order_content,
                 "Тип замовлення": ", ".join(order_type),
                 "Замірник": measurer,
                 "Дизайнер": designer,
@@ -166,9 +197,6 @@ def render_new_order_view(selected_sheet_id, drive_folder_id):
             }
 
             new_id = save_new_order(selected_sheet_id, order_payload)
-
-            # Перейменовуємо папку на Диску, додаючи згенерований ID
-            # (можна реалізувати виклик перейменування через drive_service за потреби)
 
             st.success(
                 f"✅ Замовлення **{new_id}** успішно створено!"
