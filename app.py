@@ -75,7 +75,7 @@ else:
         raw_data = get_orders_data(selected_sheet_id, "Orders")
         if raw_data:
             df = pd.DataFrame(raw_data)
-            st.dataframe(df, use_container_width=True)
+            st.dataframe(df, width="stretch")
         else:
             st.info("У цій базі замовлення відсутні або аркуш 'Orders' порожній.")
 
