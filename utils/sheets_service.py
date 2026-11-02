@@ -110,3 +110,25 @@ def save_new_order(spreadsheet_id: str, order_data: dict) -> str:
   except Exception as e:
     st.error(f"Помилка при збереженні замовлення в Таблицю: {e}")
     return ""
+
+def save_new_contact(spreadsheet_id: str, contact_data: dict) -> bool:
+  """Додає новий контакт у таблицю Contacts."""
+  client = get_gspread_client()
+  try:
+    sh = client.open_by_key(spreadsheet_id)
+    worksheet = sh.worksheet("Contacts")
+    headers = worksheet.row_values(1)
+    
+    # Генерація ID контакту (напр. CONT-001)
+    col_vals = worksheet.col_values(1)
+    next_id = f"CONT-{len(col_vals):03d}"
+    
+    full_data = {"ID Контакту": next_id}
+    full_data.update(contact_data)
+    
+    final_row = [full_data.get(h, "") for h in headers]
+    worksheet.append_row(final_row)
+    return True
+  except Exception as e:
+    st.error(f"Помилка збереження контакту: {e}")
+    return False
