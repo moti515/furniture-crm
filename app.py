@@ -58,7 +58,10 @@ else:
         selected_db_name = list(db_options.keys())[0]
         st.sidebar.info(f"📂 Активна база:\n\n**{selected_db_name}**")
 
-    selected_sheet_id = db_options[selected_db_name]
+    # ВИПРАВЛЕННЯ: Коректно витягуємо ID таблиці та ID папки Диску зі словника
+    selected_db_info = db_options[selected_db_name]
+    selected_sheet_id = selected_db_info.get("sheet_id", "")
+    drive_folder_id = selected_db_info.get("drive_folder_id", "")
 
     menu = st.sidebar.radio(
         "Навігація",
@@ -77,9 +80,6 @@ else:
             st.info("У цій базі замовлення відсутні або аркуш 'Orders' порожній.")
 
     elif menu == "➕ Нове замовлення":
-        drive_folder_id = profile.get("available_databases", {}).get(
-            selected_db_name, ""
-        )
         render_new_order_view(selected_sheet_id, drive_folder_id)
 
     elif menu == "👥 Контакти":
