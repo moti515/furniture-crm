@@ -1,5 +1,3 @@
-Ось оновлений, максимальний за деталізацією та повністю узгоджений файл **`README.md`**, який враховує точну структуровану логіку `utils/auth_service.py`, будову таблиці `Master_Config`, кешування `st.cache_data`, а також структуру `available_databases` у формі вкладеного словника (`sheet_id` та `drive_folder_id`).
-
 ```markdown
 # 🪑 Motia Furniture CRM
 
