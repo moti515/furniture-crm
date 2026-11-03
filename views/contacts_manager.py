@@ -258,29 +258,31 @@ def render_contact_form(selected_sheet_id, default_role="", contact_data_to_edit
 
 
 def render_contacts_view(selected_sheet_id):
-    """Повноцінний розділ управління контактами з ультракомпактним табличним вирівнюванням."""
+    """Повноцінний розділ управління контактами у вигляді чистої мінімалістичної таблиці."""
     st.markdown(
         """
         <style>
         div.stButton > button {
             margin-top: 28px !important;
         }
-        .contact-row {
-            display: flex;
-            align-items: center;
-            border-bottom: 1px solid rgba(150, 150, 150, 0.2);
-            padding: 6px 0px;
-            margin: 0px;
+        /* Стилізація єдиної таблиці для мінімальних відступів */
+        .contact-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
         }
-        [data-testid="stHorizontalBlock"] {
-            align-items: center !important;
-            vertical-align: middle !important;
+        .contact-table th {
+            text-align: left;
+            padding: 8px 12px;
+            color: #555;
+            font-size: 13px;
+            border-bottom: 2px solid #ddd;
         }
-        div[data-testid="column"] button {
-            margin: 0px !important;
-            padding: 2px 8px !important;
-            min-height: 28px !important;
-            font-size: 13px !important;
+        .contact-table td {
+            padding: 8px 12px;
+            font-size: 14px;
+            border-bottom: 1px solid #eee;
+            vertical-align: middle;
         }
         </style>
         """,
@@ -354,6 +356,7 @@ def render_contacts_view(selected_sheet_id):
     if filtered_records:
         st.markdown(f"**Знайдено контактів:** {len(filtered_records)}")
         
+        # Для виведення кнопок без зайвих зазорів використовуємо гібридний рядковий підхід Streamlit:
         for idx, row in enumerate(filtered_records):
             c_id = row.get("ID Контакту", "")
             c_name = row.get("ПІБ / Назва", "")
@@ -361,22 +364,23 @@ def render_contacts_view(selected_sheet_id):
             c_phone = row.get("Телефон(и)", "")
             c_comp = row.get("Компанія", "")
 
-            rc1, rc2, rc3, rc4, rc5 = st.columns([3, 3, 3, 3, 1.5])
-            
-            with rc1:
-                st.markdown(f"<span style='font-weight: 600;'>{c_name}</span>", unsafe_allow_html=True)
-            with rc2:
-                st.markdown(f"<span style='color: #555; font-size: 14px;'>{c_roles or '—'}</span>", unsafe_allow_html=True)
-            with rc3:
-                st.markdown(f"<span style='color: #555; font-size: 14px;'>{c_phone or '—'}</span>", unsafe_allow_html=True)
-            with rc4:
-                st.markdown(f"<span style='color: #555; font-size: 14px;'>{c_comp or '—'}</span>", unsafe_allow_html=True)
-            with rc5:
-                if st.button("✏️ Редагувати", key=f"edit_btn_{c_id}_{idx}", use_container_width=True):
+            # Використовуємо ультракомпактний контейнер без розділювачів-divider
+            cols = st.columns([2.5, 2.5, 2, 2, 1])
+            with cols[0]:
+                st.markdown(f"**{c_name}**")
+            with cols[1]:
+                st.markdown(f"<span style='color: #444; font-size: 13px;'>{c_roles or '—'}</span>", unsafe_allow_html=True)
+            with cols[2]:
+                st.markdown(f"<span style='color: #444; font-size: 13px;'>{c_phone or '—'}</span>", unsafe_allow_html=True)
+            with cols[3]:
+                st.markdown(f"<span style='color: #444; font-size: 13px;'>{c_comp or '—'}</span>", unsafe_allow_html=True)
+            with cols[4]:
+                if st.button("✏️", key=f"edit_btn_{c_id}_{idx}", help="Редагувати контакт"):
                     st.session_state.edit_contact_id = c_id
                     st.session_state.show_new_contact_modal = False
                     st.rerun()
             
-            st.markdown("<div style='margin: 2px 0px; border-bottom: 1px solid #eaeaea;'></div>", unsafe_allow_html=True)
+            # Тонка лінія з мінімальним відступом
+            st.markdown("<div style='margin: 0px 0px 4px 0px; border-bottom: 1px solid #f0f2f6;'></div>", unsafe_allow_html=True)
     else:
         st.info("Контактів за вашим запитом не знайдено.")
