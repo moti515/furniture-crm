@@ -5,32 +5,32 @@ from utils.sheets_service import get_all_contacts_records, save_new_contact
 ALL_ROLES = ["Замовник", "Замірник", "Дизайнер", "Конструктор", "Виробник", "Монтажник", "Інше"]
 
 
-def inject_vertical_multiselect_css():
-    """Потужні CSS-стилі для примусового вертикального вишикування тегів у мультивиборі."""
+def inject_chip_multiselect_css():
+    """CSS-стилі для горизонтального переносу тегів (чіпів) у мультивиборі."""
     st.markdown(
         """
         <style>
-        /* Загальний контейнер мультивибору */
-        .stMultiSelect div[data-baseweb="select"] {
+        /* Основний блок мультивибору */
+        div[data-baseweb="select"] {
             height: auto !important;
-            min-height: 40px !important;
+            min-height: 42px !important;
         }
-        /* Внутрішній контейнер, що містить вибрані теги */
-        .stMultiSelect div[data-baseweb="select"] > div:first-child {
+        /* Внутрішній контейнер із тегами: робимо його гнучким з автоматичним переносом (flex-wrap) */
+        div[data-baseweb="select"] > div:first-child {
             display: flex !important;
-            flex-direction: column !important;
-            align-items: stretch !important;
-            gap: 4px !important;
+            flex-wrap: wrap !important;
+            gap: 6px !important;
             height: auto !important;
-            padding: 4px !important;
+            padding: 6px !important;
         }
-        /* Кожен окремий тег на всю ширину рядка */
-        .stMultiSelect div[data-baseweb="select"] span[data-baseweb="tag"] {
-            width: 100% !important;
-            display: flex !important;
-            justify-content: space-between !important;
-            box-sizing: border-box !important;
-            margin: 2px 0 !important;
+        /* Стиль кожного окремого тегу (чіпа) */
+        div[data-baseweb="select"] span[data-baseweb="tag"] {
+            display: inline-flex !important;
+            align-items: center !important;
+            background-color: #f0f2f6 !important;
+            border-radius: 16px !important;
+            padding: 2px 8px !important;
+            margin: 0 !important;
         }
         </style>
         """,
@@ -39,8 +39,8 @@ def inject_vertical_multiselect_css():
 
 
 def render_contact_form(selected_sheet_id, default_role="", key_suffix="default", on_success=None):
-    """Повноцінна форма додавання нового контакту з вертикальним мультивибором ролей."""
-    inject_vertical_multiselect_css()
+    """Повноцінна форма додавання нового контакту."""
+    inject_chip_multiselect_css()
     
     st.info("📝 **Форма нового контакту**")
     with st.expander("Заповніть дані контакту", expanded=True):
@@ -94,7 +94,7 @@ def render_contact_form(selected_sheet_id, default_role="", key_suffix="default"
 
 def render_contacts_view(selected_sheet_id):
     """Повноцінний розділ управління контактами в меню."""
-    inject_vertical_multiselect_css()
+    inject_chip_multiselect_css()
     st.subheader("👥 Довідник контактів")
 
     if "show_new_contact_modal" not in st.session_state:
