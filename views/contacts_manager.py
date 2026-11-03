@@ -259,12 +259,24 @@ def render_contact_form(selected_sheet_id, default_role="", contact_data_to_edit
 
 def render_contacts_view(selected_sheet_id):
     """Повноцінний розділ управління контактами з можливістю фільтрації та редагування."""
-    # CSS для точного вирівнювання кнопки в один рядок з полями вводу
+    # CSS для вирівнювання кнопки додавання, кнопок редагування та компактних рядків таблиці
     st.markdown(
         """
         <style>
+        /* Вирівнювання верхньої кнопки "Додати новий контакт" */
         div.stButton > button {
             margin-top: 28px !important;
+        }
+        /* Компактне вертикальне вирівнювання кнопок "Редагувати" в таблиці та зменшення відступів */
+        div[data-testid="column"] button {
+            margin-top: -4px !important;
+            padding-top: 4px !important;
+            padding-bottom: 4px !important;
+            min-height: 32px !important;
+        }
+        /* Зменшення вертикальних відступів між горизонтальними лініями/писами в таблиці */
+        hr {
+            margin: 8px 0px !important;
         }
         </style>
         """,
@@ -345,18 +357,17 @@ def render_contacts_view(selected_sheet_id):
             c_phone = row.get("Телефон(и)", "")
             c_comp = row.get("Компанія", "")
 
-            with st.container():
-                # Відображається виключно ім'я без ID
-                rc1, rc2, rc3, rc4, rc5 = st.columns([3, 3, 3, 3, 2])
-                rc1.write(f"**{c_name}**")
-                rc2.write(f"{c_roles or '—'}")
-                rc3.write(f"{c_phone or '—'}")
-                rc4.write(f"{c_comp or '—'}")
-                with rc5:
-                    if st.button("✏️ Редагувати", key=f"edit_btn_{c_id}_{idx}", use_container_width=True):
-                        st.session_state.edit_contact_id = c_id
-                        st.session_state.show_new_contact_modal = False
-                        st.rerun()
-                st.divider()
+            # Рівне вирівнювання та компактні відступи для кожного рядка
+            rc1, rc2, rc3, rc4, rc5 = st.columns([3, 3, 3, 3, 2])
+            rc1.write(f"**{c_name}**")
+            rc2.write(f"{c_roles or '—'}")
+            rc3.write(f"{c_phone or '—'}")
+            rc4.write(f"{c_comp or '—'}")
+            with rc5:
+                if st.button("✏️ Редагувати", key=f"edit_btn_{c_id}_{idx}", use_container_width=True):
+                    st.session_state.edit_contact_id = c_id
+                    st.session_state.show_new_contact_modal = False
+                    st.rerun()
+            st.divider()
     else:
         st.info("Контактів за вашим запитом не знайдено.")
