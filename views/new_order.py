@@ -4,7 +4,7 @@ from utils.drive_service import (
     get_drive_hierarchy,
 )
 from utils.sheets_service import (
-    get_contacts_list,
+    get_all_contacts_records,
     save_new_order,
     save_new_contact,
 )
@@ -15,15 +15,31 @@ ALL_ROLES = ["Замовник", "Замірник", "Дизайнер", "Кон
 def render_new_order_view(selected_sheet_id, drive_folder_id):
     st.subheader("➕ Створення нового замовлення")
 
-    # Повідомлення про успішне створення замовлення після скидання теми/форми
     if "order_success_msg" in st.session_state and st.session_state.order_success_msg:
         st.success(st.session_state.order_success_msg)
         st.balloons()
         st.session_state.order_success_msg = ""
 
-    # Допоміжна функція для вибору кількох контактів з можливістю додавання нового
+    # Зчитуємо всі контакти 1 раз за запит сторінки
+    all_contacts_records = get_all_contacts_records(selected_sheet_id)
+
+    def filter_contacts_by_role(role_filter=""):
+        contacts = []
+        for row in all_contacts_records:
+            name = str(row.get("ПІБ / Назва", "")).strip()
+            roles_str = str(row.get("Роль / Категорія", "")).strip()
+
+            if name:
+                if role_filter:
+                    roles_list = [r.strip().lower() for r in roles_str.split(",")]
+                    if role_filter.lower() in roles_list:
+                        contacts.append(name)
+                else:
+                    contacts.append(name)
+        return sorted(list(set(contacts)))
+
     def contact_multi_selector(label, key_suffix, role_filter=""):
-        contacts = get_contacts_list(selected_sheet_id, role_filter=role_filter)
+        contacts = filter_contacts_by_role(role_filter=role_filter)
         
         col_sel, col_btn = st.columns([4, 1])
         with col_sel:
@@ -80,7 +96,7 @@ def render_new_order_view(selected_sheet_id, drive_folder_id):
                             else:
                                 st.error("❌ Помилка збереження контакту.")
                 with col_s2:
-                    if st.button("Скасувати", key=f"btn_cancel_{key_suffix}"):
+                    if st.button("Скасувати", key=f"btn_cancel_{key_suffix}setItem"):
                         st.session_state[f"show_add_{key_suffix}"] = False
                         st.rerun()
 
@@ -223,7 +239,7 @@ def render_new_order_view(selected_sheet_id, drive_folder_id):
 
     st.markdown("---")
 
-    # --- 💾 ЗБЕРЕЖЕННЯ З ЗМІНЕНОЮ НАЗВОЮ КНОПКИ ---
+    # --- 💾 ЗБЕРЕЖЕННЯ ---
     if st.button("Зберегти нове замовлення", type="primary", use_container_width=True):
         if not order_name or not customer:
             st.error("❌ Будь ласка, заповніть обов'язкові поля: Замовник та Назва замовлення.")
@@ -234,7 +250,6 @@ def render_new_order_view(selected_sheet_id, drive_folder_id):
                     final_city = selected_city
                     final_object = selected_object
 
-                    # ПУНКТ 5: Папка на Диску створюється строго за назвою замовлення
                     folder_link = create_order_folder_structure(
                         drive_folder_id,
                         final_country,
@@ -266,10 +281,8 @@ def render_new_order_view(selected_sheet_id, drive_folder_id):
                     new_id = save_new_order(selected_sheet_id, order_payload)
 
                     if new_id:
-                        # ПУНКТ 2: Повідомлення + скидання стану
                         st.session_state.order_success_msg = f"✅ Замовлення **{new_id}** успішно створено! [Відкрити папку на Диску]({folder_link})"
 
-                        # Очищаємо ключі форми в session_state для автоматичного скидання
                         keys_to_clear = [
                             "order_name_val", "order_content_val", "address_val",
                             "sel_country", "sel_city", "sel_object",
