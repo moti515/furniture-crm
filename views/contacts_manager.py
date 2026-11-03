@@ -6,23 +6,31 @@ ALL_ROLES = ["Замовник", "Замірник", "Дизайнер", "Кон
 
 
 def inject_vertical_multiselect_css():
-    """Глобальні CSS-стилі для вертикального вишикування тегів у мультивиборі."""
+    """Потужні CSS-стилі для примусового вертикального вишикування тегів у мультивиборі."""
     st.markdown(
         """
         <style>
-        div[data-baseweb="select"] {
+        /* Загальний контейнер мультивибору */
+        .stMultiSelect div[data-baseweb="select"] {
             height: auto !important;
-            min-height: 38px;
+            min-height: 40px !important;
         }
-        div[data-baseweb="select"] > div:first-child {
-            flex-direction: column !important;
-            align-items: flex-start !important;
-            height: auto !important;
-        }
-        div[data-baseweb="select"] span[data-baseweb="tag"] {
+        /* Внутрішній контейнер, що містить вибрані теги */
+        .stMultiSelect div[data-baseweb="select"] > div:first-child {
             display: flex !important;
+            flex-direction: column !important;
+            align-items: stretch !important;
+            gap: 4px !important;
+            height: auto !important;
+            padding: 4px !important;
+        }
+        /* Кожен окремий тег на всю ширину рядка */
+        .stMultiSelect div[data-baseweb="select"] span[data-baseweb="tag"] {
             width: 100% !important;
-            margin: 3px 0 !important;
+            display: flex !important;
+            justify-content: space-between !important;
+            box-sizing: border-box !important;
+            margin: 2px 0 !important;
         }
         </style>
         """,
@@ -86,6 +94,7 @@ def render_contact_form(selected_sheet_id, default_role="", key_suffix="default"
 
 def render_contacts_view(selected_sheet_id):
     """Повноцінний розділ управління контактами в меню."""
+    inject_vertical_multiselect_css()
     st.subheader("👥 Довідник контактів")
 
     if "show_new_contact_modal" not in st.session_state:
