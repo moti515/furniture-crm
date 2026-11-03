@@ -9,8 +9,11 @@ from utils.sheets_service import (
 )
 from views.contacts_manager import render_contact_form
 
+ALL_ROLES = ["Замовник", "Замірник", "Дизайнер", "Конструктор", "Виробник", "Монтажник", "Інше"]
+
 
 def render_new_order_view(selected_sheet_id, drive_folder_id):
+    # CSS для того, щоб теги мультивибору розміщувалися строго один під другим
     st.markdown(
         """
         <style>
@@ -18,9 +21,15 @@ def render_new_order_view(selected_sheet_id, drive_folder_id):
             height: auto !important;
             min-height: 38px;
         }
-        div[data-baseweb="select"] > div {
+        div[data-baseweb="select"] > div:first-child {
+            flex-direction: column !important;
+            align-items: flex-start !important;
             height: auto !important;
-            flex-wrap: wrap !important;
+        }
+        div[data-baseweb="select"] span[data-baseweb="tag"] {
+            display: flex !important;
+            width: 100% !important;
+            margin: 3px 0 !important;
         }
         </style>
         """,
@@ -39,16 +48,20 @@ def render_new_order_view(selected_sheet_id, drive_folder_id):
     def filter_contacts_by_role(role_filter=""):
         contacts = []
         for row in all_contacts_records:
+            contact_id = str(row.get("ID Контакту", "")).strip()
             name = str(row.get("ПІБ / Назва", "")).strip()
             roles_str = str(row.get("Роль / Категорія", "")).strip()
 
             if name:
+                # Формуємо унікальний рядок з урахуванням ID, щоб не втрачати контакти з однаковими іменами
+                display_label = f"{name} ({contact_id})" if contact_id else name
+                
                 if role_filter:
                     roles_list = [r.strip().lower() for r in roles_str.split(",")]
                     if role_filter.lower() in roles_list:
-                        contacts.append(name)
+                        contacts.append(display_label)
                 else:
-                    contacts.append(name)
+                    contacts.append(display_label)
         return sorted(list(set(contacts)))
 
     def contact_multi_selector(label, key_suffix, role_filter=""):
