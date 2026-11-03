@@ -346,9 +346,9 @@ def render_contacts_view(selected_sheet_id):
             c_comp = row.get("Компанія", "")
 
             with st.container():
-                # Рівне вирівнювання колонок таблиці (Ім'я, Ролі, Телефони, Компанія, Редагування)
+                # Відображається виключно ім'я без ID
                 rc1, rc2, rc3, rc4, rc5 = st.columns([3, 3, 3, 3, 2])
-                rc1.write(f"**{c_name}**\n\n`{c_id}`")
+                rc1.write(f"**{c_name}**")
                 rc2.write(f"{c_roles or '—'}")
                 rc3.write(f"{c_phone or '—'}")
                 rc4.write(f"{c_comp or '—'}")
