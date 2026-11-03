@@ -6,14 +6,11 @@ from utils.drive_service import (
 from utils.sheets_service import (
     get_all_contacts_records,
     save_new_order,
-    save_new_contact,
 )
-
-ALL_ROLES = ["Замовник", "Замірник", "Дизайнер", "Конструктор", "Виробник", "Монтажник", "Інше"]
+from views.contacts_manager import render_contact_form
 
 
 def render_new_order_view(selected_sheet_id, drive_folder_id):
-    # Додаємо CSS для вертикального розширення multiselect при множинному виборі
     st.markdown(
         """
         <style>
@@ -71,55 +68,20 @@ def render_new_order_view(selected_sheet_id, drive_folder_id):
 
         if add_clicked or st.session_state.get(f"show_add_{key_suffix}", False):
             st.session_state[f"show_add_{key_suffix}"] = True
-            st.info(f"📝 **Додавання нового контакту ({label})**")
-            with st.expander(f"Форма контакту ({label})", expanded=True):
-                new_name = st.text_input("ПІБ / Назва *", key=f"new_name_{key_suffix}")
-                col_a, col_b = st.columns(2)
-                with col_a:
-                    new_phone = st.text_input("Телефон", key=f"new_phone_{key_suffix}")
-                    new_email = st.text_input("Email", key=f"new_email_{key_suffix}")
-                with col_b:
-                    default_roles = [role_filter] if role_filter and role_filter in ALL_ROLES else []
-                    new_roles = st.multiselect(
-                        "Роль / Категорія *",
-                        options=ALL_ROLES,
-                        default=default_roles,
-                        key=f"new_roles_{key_suffix}"
-                    )
-                    # Точна вимога щодо підказки
-                    st.caption("💡 Для додавання категорій/ролей - зверніться до адміністратора")
-                    new_comment = st.text_input("Коментар", key=f"new_com_{key_suffix}")
+            
+            def close_inline_form():
+                st.session_state[f"show_add_{key_suffix}"] = False
+                st.rerun()
 
-                col_s1, col_s2 = st.columns(2)
-                with col_s1:
-                    if st.button("💾 Зберегти контакт", key=f"btn_save_contact_{key_suffix}"):
-                        if not new_name:
-                            st.error("❌ Введіть ПІБ або назву контакту.")
-                        elif not new_roles:
-                            st.error("❌ Оберіть принаймні одну роль / категорію.")
-                        else:
-                            contact_data = {
-                                "ПІБ / Назва": new_name,
-                                "Роль / Категорія": ", ".join(new_roles),
-                                "Телефон(и)": new_phone,
-                                "Email(и)": new_email,
-                                "Коментар": new_comment,
-                            }
-                            success = save_new_contact(selected_sheet_id, contact_data)
-                            if success:
-                                st.session_state[f"show_add_{key_suffix}"] = False
-                                st.success(f"✅ Контакт '{new_name}' успішно додано!")
-                                st.rerun()
-                            else:
-                                st.error("❌ Помилка збереження контакту.")
-                with col_s2:
-                    if st.button("Скасувати", key=f"btn_cancel_{key_suffix}setItem"):
-                        st.session_state[f"show_add_{key_suffix}"] = False
-                        st.rerun()
+            render_contact_form(
+                selected_sheet_id=selected_sheet_id,
+                default_role=role_filter,
+                key_suffix=f"inline_{key_suffix}",
+                on_success=close_inline_form
+            )
 
         return ", ".join(selected)
 
-    # 2. Сканування ієрархії Google Drive
     with st.spinner("Завантаження ієрархії папок з Google Диску..."):
         try:
             hierarchy, _ = get_drive_hierarchy(drive_folder_id)
@@ -127,7 +89,6 @@ def render_new_order_view(selected_sheet_id, drive_folder_id):
             st.error(f"Помилка доступу до Google Диску: {e}")
             hierarchy = {}
 
-    # --- 📌 ОСНОВНА ІНФОРМАЦІЯ ---
     st.markdown("### 📌 Основна інформація")
     col1, col2 = st.columns(2)
     with col1:
@@ -147,7 +108,6 @@ def render_new_order_view(selected_sheet_id, drive_folder_id):
 
     st.markdown("---")
 
-    # --- 📍 ЛОКАЦІЯ ТА АДРЕСА ---
     st.markdown("### 📍 Локація та адреса виконання замовлення")
     loc_col1, loc_col2, loc_col3 = st.columns(3)
     with loc_col1:
@@ -176,7 +136,6 @@ def render_new_order_view(selected_sheet_id, drive_folder_id):
 
     st.markdown("---")
 
-    # --- 👥 ВІДПОВІДАЛЬНІ ОСОБИ ---
     st.markdown("### 👥 Відповідальні особи")
     col3, col4, col5 = st.columns(3)
     with col3:
@@ -191,7 +150,6 @@ def render_new_order_view(selected_sheet_id, drive_folder_id):
 
     st.markdown("---")
 
-    # --- ⚙️ ТИПИ ЗАМОВЛЕННЯ ТА ЕТАПИ КОНВЕЄРА ---
     st.markdown("### ⚙️ Типи замовлення та етапи конвеєра")
     
     t_col1, t_col2, t_col3 = st.columns(3)
@@ -256,30 +214,25 @@ def render_new_order_view(selected_sheet_id, drive_folder_id):
 
     st.markdown("---")
 
-    # --- 💾 ЗБЕРЕЖЕННЯ ---
     if st.button("Зберегти нове замовлення", type="primary", use_container_width=True):
         if not order_name or not customer:
             st.error("❌ Будь ласка, заповніть обов'язкові поля: Замовник та Назва замовлення.")
         else:
             with st.spinner("Створення папок на Google Диску та збереження даних..."):
                 try:
-                    final_country = selected_country
-                    final_city = selected_city
-                    final_object = selected_object
-
                     folder_link = create_order_folder_structure(
                         drive_folder_id,
-                        final_country,
-                        final_city,
-                        final_object,
+                        selected_country,
+                        selected_city,
+                        selected_object,
                         order_name,
                     )
 
                     order_payload = {
                         "Замовник / Представник": customer,
-                        "Країна": final_country,
-                        "Місто / Ort": final_city,
-                        "Назва об'єкта": final_object,
+                        "Країна": selected_country,
+                        "Місто / Ort": selected_city,
+                        "Назва об'єкта": selected_object,
                         "Адреса": address,
                         "Назва замовлення": order_name,
                         "Суть/Зміст замовлення": order_content,
