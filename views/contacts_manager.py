@@ -320,8 +320,16 @@ def render_contacts_view(selected_sheet_id):
         name = str(row.get("ПІБ / Назва", ""))
         comp = str(row.get("Компанія", ""))
         roles = str(row.get("Роль / Категорія", ""))
+        addr = str(row.get("Адреса / Місто", ""))
+        comm = str(row.get("Коментар", ""))
 
-        match_search = not search_query or (search_query.lower() in name.lower() or search_query.lower() in comp.lower())
+        q = search_query.lower()
+        match_search = not search_query or (
+            q in name.lower() or 
+            q in comp.lower() or 
+            q in addr.lower() or 
+            q in comm.lower()
+        )
         match_role = role_filter == "Всі ролі" or role_filter.lower() in roles.lower()
 
         if match_search and match_role:
@@ -335,17 +343,17 @@ def render_contacts_view(selected_sheet_id):
             c_name = row.get("ПІБ / Назва", "")
             c_roles = row.get("Роль / Категорія", "")
             c_phone = row.get("Телефон(и)", "")
-            c_email = row.get("Email(и)", "")
             c_comp = row.get("Компанія", "")
 
             with st.container():
-                rc1, rc2, rc3, rc4, rc5 = st.columns([2, 2, 2, 2, 1])
-                rc1.write(f"**{c_name}** (`{c_id}`)")
-                rc2.write(f"📌 {c_roles}")
-                rc3.write(f"📞 {c_phone or '—'}")
-                rc4.write(f"✉️ {c_email or c_comp or '—'}")
+                # Рівне вирівнювання колонок таблиці (Ім'я, Ролі, Телефони, Компанія, Редагування)
+                rc1, rc2, rc3, rc4, rc5 = st.columns([3, 3, 3, 3, 2])
+                rc1.write(f"**{c_name}**\n\n`{c_id}`")
+                rc2.write(f"{c_roles or '—'}")
+                rc3.write(f"{c_phone or '—'}")
+                rc4.write(f"{c_comp or '—'}")
                 with rc5:
-                    if st.button("✏️ Редагувати", key=f"edit_btn_{c_id}_{idx}"):
+                    if st.button("✏️ Редагувати", key=f"edit_btn_{c_id}_{idx}", use_container_width=True):
                         st.session_state.edit_contact_id = c_id
                         st.session_state.show_new_contact_modal = False
                         st.rerun()
