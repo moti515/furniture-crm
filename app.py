@@ -3,6 +3,7 @@ import streamlit as st
 from utils.auth_service import authenticate_user
 from utils.sheets_service import get_orders_data
 from views.new_order import render_new_order_view
+from views.contacts_manager import render_contacts_view
 
 st.set_page_config(
     page_title="Motia Furniture CRM", page_icon="🪑", layout="wide"
@@ -82,5 +83,7 @@ else:
     elif menu == "➕ Нове замовлення":
         render_new_order_view(selected_sheet_id, drive_folder_id)
 
+    elif menu == "👥 Контакти":
+        render_contacts_view(selected_sheet_id)
     elif menu == "👥 Контакти":
         st.info("Розділ довідника контактів знаходиться в розробці.")
