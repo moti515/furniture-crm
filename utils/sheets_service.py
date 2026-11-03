@@ -22,32 +22,14 @@ def get_orders_data(spreadsheet_id: str, sheet_name: str = "Orders"):
         return []
 
 
-def get_contacts_list(spreadsheet_id: str, role_filter: str = None) -> list:
-    """Отримує список ПІБ / Назв з аркуша Contacts.
-
-    Якщо вказано role_filter, повертає тільки контакти, що мають цю роль у колонці 'Роль / Категорія'.
-    """
+@st.cache_data(ttl=30)
+def get_all_contacts_records(spreadsheet_id: str) -> list:
+    """Зчитує всі записи з аркуша Contacts один раз і кешує на 30 секунд."""
     client = get_gspread_client()
     try:
         sh = client.open_by_key(spreadsheet_id)
         worksheet = sh.worksheet("Contacts")
-        records = worksheet.get_all_records()
-
-        contacts = []
-        for row in records:
-            name = str(row.get("ПІБ / Назва", "")).strip()
-            roles_str = str(row.get("Роль / Категорія", "")).strip()
-
-            if name:
-                if role_filter:
-                    # Розбиваємо перелік ролей за комою
-                    roles_list = [r.strip().lower() for r in roles_str.split(",")]
-                    if role_filter.lower() in roles_list:
-                        contacts.append(name)
-                else:
-                    contacts.append(name)
-
-        return sorted(list(set(contacts)))
+        return worksheet.get_all_records()
     except Exception as e:
         st.error(f"Помилка завантаження контактів: {e}")
         return []
@@ -90,11 +72,9 @@ def save_new_order(spreadsheet_id: str, order_data: dict) -> str:
         order_id = generate_next_order_id(spreadsheet_id)
         created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        # Зчитуємо актуальні заголовки аркуша Orders і очищаємо від зайвих пробілів
         raw_headers = worksheet.row_values(1)
         headers = [str(h).strip() for h in raw_headers]
 
-        # Готуємо повний словник даних
         full_data = {
             "ID Замовлення": order_id,
             "Поточний статус": "Нове замовлення",
@@ -104,7 +84,6 @@ def save_new_order(spreadsheet_id: str, order_data: dict) -> str:
         }
         full_data.update(order_data)
 
-        # Формуємо рядок строго відповідно до порядку колонок у таблиці
         final_row = [str(full_data.get(h, "")) for h in headers]
 
         worksheet.append_row(final_row)
@@ -116,7 +95,7 @@ def save_new_order(spreadsheet_id: str, order_data: dict) -> str:
 
 
 def save_new_contact(spreadsheet_id: str, contact_data: dict) -> bool:
-    """Додає новий контакт у таблицю Contacts."""
+    """Додає новий контакт у таблицю Contacts та скидає кеш."""
     client = get_gspread_client()
     try:
         sh = client.open_by_key(spreadsheet_id)
@@ -132,6 +111,9 @@ def save_new_contact(spreadsheet_id: str, contact_data: dict) -> bool:
 
         final_row = [str(full_data.get(h, "")) for h in headers]
         worksheet.append_row(final_row)
+        
+        # Скидаємо кеш контактів, щоб новий контакт одразу з'явився у списках
+        st.cache_data.clear()
         return True
     except Exception as e:
         st.error(f"Помилка збереження контакту: {e}")
