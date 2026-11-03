@@ -5,32 +5,29 @@ from utils.sheets_service import get_all_contacts_records, save_new_contact
 ALL_ROLES = ["Замовник", "Замірник", "Дизайнер", "Конструктор", "Виробник", "Монтажник", "Інше"]
 
 
-def inject_vertical_multiselect_css():
-    """CSS-стилі для горизонтального переносу тегів (чіпів) у мультивиборі."""
+def inject_auto_expand_multiselect_css():
+    """CSS для автоматичного розширення поля мультивибору по висоті, щоб усі теги вміщалися."""
     st.markdown(
         """
         <style>
-        /* Основний блок мультивибору */
+        /* Знімаємо обмеження висоти та дозволяємо контейнеру рости */
         div[data-baseweb="select"] {
             height: auto !important;
             min-height: 42px !important;
         }
-        /* Внутрішній контейнер із тегами: робимо його гнучким з автоматичним переносом (flex-wrap) */
-        div[data-baseweb="select"] > div:first-child {
-            display: flex !important;
-            flex-wrap: wrap !important;
-            gap: 6px !important;
+        /* Внутрішній блок адаптується за висотою та переносить теги */
+        div[data-baseweb="select"] > div {
             height: auto !important;
-            padding: 6px !important;
+            min-height: 42px !important;
+            max-height: none !important;
+            overflow: visible !important;
+            flex-wrap: wrap !important;
+            padding: 4px 6px !important;
         }
-        /* Стиль кожного окремого тегу (чіпа) */
-        div[data-baseweb="select"] span[data-baseweb="tag"] {
-            display: inline-flex !important;
-            align-items: center !important;
-            background-color: #f0f2f6 !important;
-            border-radius: 16px !important;
-            padding: 2px 8px !important;
-            margin: 0 !important;
+        /* Прибираємо внутрішні обмеження списків */
+        div[data-baseweb="select"] ul {
+            height: auto !important;
+            max-height: none !important;
         }
         </style>
         """,
@@ -40,7 +37,7 @@ def inject_vertical_multiselect_css():
 
 def render_contact_form(selected_sheet_id, default_role="", key_suffix="default", on_success=None):
     """Повноцінна форма додавання нового контакту."""
-    inject_vertical_multiselect_css()
+    inject_auto_expand_multiselect_css()
     
     st.info("📝 **Форма нового контакту**")
     with st.expander("Заповніть дані контакту", expanded=True):
@@ -94,7 +91,7 @@ def render_contact_form(selected_sheet_id, default_role="", key_suffix="default"
 
 def render_contacts_view(selected_sheet_id):
     """Повноцінний розділ управління контактами в меню."""
-    inject_vertical_multiselect_css()
+    inject_auto_expand_multiselect_css()
     st.subheader("👥 Довідник контактів")
 
     if "show_new_contact_modal" not in st.session_state:
