@@ -7,13 +7,10 @@ from utils.sheets_service import (
     get_all_contacts_records,
     save_new_order,
 )
-from views.contacts_manager import render_contact_form, inject_auto_expand_multiselect_css
+from views.contacts_manager import render_contact_picker
 
 
 def render_new_order_view(selected_sheet_id, drive_folder_id):
-    # Викликаємо загальні стилі вертикального мультивибору
-    inject_auto_expand_multiselect_css()
-
     st.subheader("➕ Створення нового замовлення")
 
     if "order_success_msg" in st.session_state and st.session_state.order_success_msg:
@@ -22,57 +19,6 @@ def render_new_order_view(selected_sheet_id, drive_folder_id):
         st.session_state.order_success_msg = ""
 
     all_contacts_records = get_all_contacts_records(selected_sheet_id)
-
-    def filter_contacts_by_role(role_filter=""):
-        contacts = []
-        for row in all_contacts_records:
-            contact_id = str(row.get("ID Контакту", "")).strip()
-            name = str(row.get("ПІБ / Назва", "")).strip()
-            roles_str = str(row.get("Роль / Категорія", "")).strip()
-
-            if name:
-                # Забезпечуємо унікальність за рахунок ID у мітці, навіть якщо імена однакові
-                display_label = f"{name} ({contact_id})" if contact_id else name
-                
-                if role_filter:
-                    roles_list = [r.strip().lower() for r in roles_str.split(",")]
-                    if role_filter.lower() in roles_list:
-                        contacts.append(display_label)
-                else:
-                    contacts.append(display_label)
-        return sorted(list(set(contacts)))
-
-    def contact_multi_selector(label, key_suffix, role_filter=""):
-        contacts = filter_contacts_by_role(role_filter=role_filter)
-        
-        col_sel, col_btn = st.columns([4, 1])
-        with col_sel:
-            selected = st.multiselect(
-                label,
-                options=contacts,
-                key=f"sel_{key_suffix}"
-            )
-        with col_btn:
-            st.write(" ")
-            st.write(" ")
-            add_clicked = st.button("➕ Новий", key=f"btn_add_mode_{key_suffix}")
-
-        if add_clicked or st.session_state.get(f"show_add_{key_suffix}", False):
-            st.session_state[f"show_add_{key_suffix}"] = True
-            
-            def close_inline_form():
-                st.session_state[f"show_add_{key_suffix}"] = False
-                st.rerun()
-
-            # Викликаємо форму з менеджеру контактів
-            render_contact_form(
-                selected_sheet_id=selected_sheet_id,
-                default_role=role_filter,
-                key_suffix=f"inline_{key_suffix}",
-                on_success=close_inline_form
-            )
-
-        return ", ".join(selected)
 
     with st.spinner("Завантаження ієрархії папок з Google Диску..."):
         try:
@@ -84,7 +30,10 @@ def render_new_order_view(selected_sheet_id, drive_folder_id):
     st.markdown("### 📌 Основна інформація")
     col1, col2 = st.columns(2)
     with col1:
-        customer = contact_multi_selector("Замовник / Представник *", "customer", "Замовник")
+        customer = render_contact_picker(
+            "Замовник / Представник *", "customer", "Замовник", 
+            selected_sheet_id=selected_sheet_id, all_contacts_records=all_contacts_records
+        )
         order_name = st.text_input(
             "Назва замовлення *",
             placeholder="Напр., Кухня фасади МДФ фарбовані",
@@ -131,14 +80,14 @@ def render_new_order_view(selected_sheet_id, drive_folder_id):
     st.markdown("### 👥 Відповідальні особи")
     col3, col4, col5 = st.columns(3)
     with col3:
-        measurer = contact_multi_selector("Замірник", "measurer", "Замірник")
-        designer = contact_multi_selector("Дизайнер", "designer", "Дизайнер")
+        measurer = render_contact_picker("Замірник", "measurer", "Замірник", selected_sheet_id=selected_sheet_id, all_contacts_records=all_contacts_records)
+        designer = render_contact_picker("Дизайнер", "designer", "Дизайнер", selected_sheet_id=selected_sheet_id, all_contacts_records=all_contacts_records)
     with col4:
-        constructor = contact_multi_selector("Конструктор", "constructor", "Конструктор")
-        producer = contact_multi_selector("Виробник", "producer", "Виробник")
+        constructor = render_contact_picker("Конструктор", "constructor", "Конструктор", selected_sheet_id=selected_sheet_id, all_contacts_records=all_contacts_records)
+        producer = render_contact_picker("Виробник", "producer", "Виробник", selected_sheet_id=selected_sheet_id, all_contacts_records=all_contacts_records)
     with col5:
-        installer = contact_multi_selector("Монтажник", "installer", "Монтажник")
-        other_persons = contact_multi_selector("Інші пов'язані особи", "other_persons", "")
+        installer = render_contact_picker("Монтажник", "installer", "Монтажник", selected_sheet_id=selected_sheet_id, all_contacts_records=all_contacts_records)
+        other_persons = render_contact_picker("Інші пов'язані особи", "other_persons", "", selected_sheet_id=selected_sheet_id, all_contacts_records=all_contacts_records)
 
     st.markdown("---")
 
@@ -248,8 +197,6 @@ def render_new_order_view(selected_sheet_id, drive_folder_id):
                         keys_to_clear = [
                             "order_name_val", "order_content_val", "address_val",
                             "sel_country", "sel_city", "sel_object",
-                            "sel_customer", "sel_measurer", "sel_designer",
-                            "sel_constructor", "sel_producer", "sel_installer", "sel_other_persons",
                             "chk_m", "chk_d", "chk_c", "chk_p", "chk_i", "chk_dg", "chk_s",
                             "s_meas", "c_meas", "s_des", "c_des", "s_con", "c_con",
                             "s_prod", "c_prod", "s_inst", "c_inst", "s_del", "c_del"
@@ -257,6 +204,12 @@ def render_new_order_view(selected_sheet_id, drive_folder_id):
                         for k in keys_to_clear:
                             if k in st.session_state:
                                 del st.session_state[k]
+                                
+                        # Очищаємо обрані контакти в state
+                        for suffix in ["customer", "measurer", "designer", "constructor", "producer", "installer", "other_persons"]:
+                            st_key = f"picked_contacts_{suffix}"
+                            if st_key in st.session_state:
+                                st.session_state[st_key] = []
 
                         st.rerun()
 
