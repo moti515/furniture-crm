@@ -226,7 +226,7 @@ def render_contact_form(selected_sheet_id, default_role="", contact_data_to_edit
                         contact_payload["ID Контакту"] = contact_id
                         
                     success = save_new_contact(selected_sheet_id, contact_payload)
-                        
+                        D_success = success
                     if success:
                         st.success(f"✅ Контакт '{name}' успішно збережено!")
                         role_state_key = f"picked_roles_{sfx}"
@@ -258,25 +258,37 @@ def render_contact_form(selected_sheet_id, default_role="", contact_data_to_edit
 
 
 def render_contacts_view(selected_sheet_id):
-    """Повноцінний розділ управління контактами з можливістю фільтрації та редагування."""
-    # CSS для вирівнювання кнопки додавання, кнопок редагування та компактних рядків таблиці
+    """Повноцінний розділ управління контактами з ультракомпактним табличним вирівнюванням."""
+    # Потужний CSS для мінімізації відступів, вирівнювання кнопок та рядків таблиці
     st.markdown(
         """
         <style>
-        /* Вирівнювання верхньої кнопки "Додати новий контакт" */
+        /* Верхня кнопка додавання контакту */
         div.stButton > button {
             margin-top: 28px !important;
         }
-        /* Компактне вертикальне вирівнювання кнопок "Редагувати" в таблиці та зменшення відступів */
-        div[data-testid="column"] button {
-            margin-top: -4px !important;
-            padding-top: 4px !important;
-            padding-bottom: 4px !important;
-            min-height: 32px !important;
+        
+        /* Ультракомпактні рядки таблиці контактів */
+        .contact-row {
+            display: flex;
+            align-items: center;
+            border-bottom: 1px solid rgba(150, 150, 150, 0.2);
+            padding: 6px 0px;
+            margin: 0px;
         }
-        /* Зменшення вертикальних відступів між горизонтальними лініями/писами в таблиці */
-        hr {
-            margin: 8px 0px !important;
+        
+        /* Зменшення внутрішніх відступів у колонках таблиці контактів */
+        [data-testid="stHorizontalBlock"] {
+            align-items: center !important;
+            vertical-align: middle !important;
+        }
+        
+        /* Кнопка редагування всередині рядка */
+        div[data-testid="column"] button {
+            margin: 0px !important;
+            padding: 2px 8px !important;
+            min-height: 28px !important;
+            font-size: 13px !important;
         }
         </style>
         """,
@@ -350,6 +362,7 @@ def render_contacts_view(selected_sheet_id):
     if filtered_records:
         st.markdown(f"**Знайдено контактів:** {len(filtered_records)}")
         
+        # Виводимо ультракомпактну таблицю з мінімальними зазорами
         for idx, row in enumerate(filtered_records):
             c_id = row.get("ID Контакту", "")
             c_name = row.get("ПІБ / Назва", "")
@@ -357,17 +370,24 @@ def render_contacts_view(selected_sheet_id):
             c_phone = row.get("Телефон(и)", "")
             c_comp = row.get("Компанія", "")
 
-            # Рівне вирівнювання та компактні відступи для кожного рядка
-            rc1, rc2, rc3, rc4, rc5 = st.columns([3, 3, 3, 3, 2])
-            rc1.write(f"**{c_name}**")
-            rc2.write(f"{c_roles or '—'}")
-            rc3.write(f"{c_phone or '—'}")
-            rc4.write(f"{c_comp or '—'}")
+            # Рядок таблиці у вигляді колонок з вертикальним вирівнюванням по центру
+            rc1, rc2, rc3, rc4, rc5 = st.columns([3, 3, 3, 3, 1.5])
+            
+            with rc1:
+                st.markdown(f"<span style='font-weight: 600;'>{c_name}</span>", unsafe_allow_html=True)
+            with rc2:
+                st.markdown(f"<span style='color: #555; font-size: 14px;'>{c_roles or '—'}</span>", unsafe_allow_html=True)
+            with rc3:
+                st.markdown(f"<span style='color: #555; font-size: 14px;'>{c_phone or '—'}</span>", unsafe_allow_html=True)
+            with rc4:
+                st.markdown(f"<span style='color: #555; font-size: 14px;'>{c_comp or '—'}</span>", unsafe_allow_html=True)
             with rc5:
                 if st.button("✏️ Редагувати", key=f"edit_btn_{c_id}_{idx}", use_container_width=True):
                     st.session_state.edit_contact_id = c_id
                     st.session_state.show_new_contact_modal = False
                     st.rerun()
-            st.divider()
+            
+            # Тоненький мінімальний роздільник замість стандартного st.divider()
+            st.markdown("<div style='margin: 2px 0px; border-bottom: 1px solid #eaeaea;'></div>", unsafe_allow_html=True)
     else:
         st.info("Контактів за вашим запитом не знайдено.")
