@@ -10,12 +10,11 @@ ALL_ROLES = ["Замовник", "Замірник", "Дизайнер", "Кон
 
 
 def render_role_picker(label, key_suffix, default_roles=None):
-    """Двоколоночний компонент вибору ролей / категорій."""
+    """Двоколоночний компонент вибору ролей / категорій всередині форми контакту."""
     st.markdown(f"**{label} *:**")
     
     state_key = f"picked_roles_{key_suffix}"
     if state_key not in st.session_state:
-        # Ініціалізуємо початковими ролями, якщо вони передані (при редагуванні)
         if default_roles:
             st.session_state[state_key] = [r.strip() for r in default_roles.split(",") if r.strip()]
         else:
@@ -52,35 +51,100 @@ def render_role_picker(label, key_suffix, default_roles=None):
     return st.session_state[state_key]
 
 
-def render_contact_form(selected_sheet_id, contact_data_to_edit=None, on_success=None):
+def render_contact_picker(label, key_suffix, role_filter="", selected_sheet_id=None, all_contacts_records=None):
+    """Двоколоночний інтерактивний компонент вибору контактів для форми замовлення."""
+    st.markdown(f"**{label}**")
+    
+    state_key = f"picked_contacts_{key_suffix}"
+    if state_key not in st.session_state:
+        st.session_state[state_key] = []
+        
+    all_contacts = []
+    for row in all_contacts_records:
+        contact_id = str(row.get("ID Контакту", "")).strip()
+        name = str(row.get("ПІБ / Назва", "")).strip()
+        roles_str = str(row.get("Роль / Категорія", "")).strip()
+
+        if name:
+            display_label = f"{name} ({contact_id})" if contact_id else name
+            if role_filter:
+                roles_list = [r.strip().lower() for r in roles_str.split(",")]
+                if role_filter.lower() in roles_list:
+                    all_contacts.append(display_label)
+            else:
+                all_contacts.append(display_label)
+    all_contacts = sorted(list(set(all_contacts)))
+    
+    available_contacts = [c for c in all_contacts if c not in st.session_state[state_key]]
+    
+    col_left, col_right, col_btn = st.columns([3, 3, 1])
+    
+    with col_left:
+        st.markdown("<small><b>Вибрані:</b></small>", unsafe_allow_html=True)
+        if not st.session_state[state_key]:
+            st.caption("Щойно доданих немає")
+        else:
+            for idx, item in enumerate(st.session_state[state_key]):
+                sub_c1, sub_c2 = st.columns([5, 1])
+                with sub_c1:
+                    st.text(item)
+                with sub_c2:
+                    if st.button("❌", key=f"del_{key_suffix}_{idx}_{item}", help="Видалити"):
+                        st.session_state[state_key].remove(item)
+                        st.rerun()
+                        
+    with col_right:
+        st.markdown("<small><b>Додати з бази:</b></small>", unsafe_allow_html=True)
+        options = ["-- Оберіть контакт --"] + available_contacts
+        chosen = st.selectbox("Додати", options=options, key=f"sel_box_{key_suffix}", label_visibility="collapsed")
+        if chosen and chosen != "-- Оберіть контакт --":
+            if chosen not in st.session_state[state_key]:
+                st.session_state[state_key].append(chosen)
+                st.rerun()
+                
+    with col_btn:
+        st.markdown("<small>&nbsp;</small>", unsafe_allow_html=True)
+        if st.button("➕ Новий", key=f"btn_add_{key_suffix}"):
+            st.session_state[f"show_add_{key_suffix}"] = True
+            st.rerun()
+            
+    if st.session_state.get(f"show_add_{key_suffix}", False):
+        def close_form():
+            st.session_state[f"show_add_{key_suffix}"] = False
+            st.rerun()
+        render_contact_form(
+            selected_sheet_id=selected_sheet_id,
+            default_role=role_filter,
+            key_suffix=f"inline_{key_suffix}",
+            on_success=close_form
+        )
+        
+    return ", ".join(st.session_state[state_key])
+
+
+def render_contact_form(selected_sheet_id, default_role="", contact_data_to_edit=None, key_suffix="new_contact", on_success=None):
     """Оптимізована форма додавання або редагування контакту з розширеними полями."""
     is_edit = contact_data_to_edit is not None
     title = f"📝 Редагування контакту: {contact_data_to_edit.get('ПІБ / Назва', '')}" if is_edit else "📝 Форма нового контакту"
     
     st.info(title)
-    
-    # Ключовий суфікс для унікальності віджетів
-    sfx = contact_data_to_edit.get("ID Контакту", "new") if is_edit else "new_contact"
+    sfx = contact_data_to_edit.get("ID Контакту", "edit") if is_edit else key_suffix
 
     with st.expander("Детальна інформація про контакт", expanded=True):
-        # Незмінний ID при редагуванні
         if is_edit:
             st.text_input("ID Контакту", value=contact_data_to_edit.get("ID Контакту", ""), disabled=True)
 
-        # Ряд 1: ПІБ та Компанія
         col1, col2 = st.columns(2)
         with col1:
             name = st.text_input("ПІБ / Назва *", value=contact_data_to_edit.get("ПІБ / Назва", "") if is_edit else "", key=f"name_{sfx}")
         with col2:
             company = st.text_input("Компанія", value=contact_data_to_edit.get("Компанія", "") if is_edit else "", key=f"company_{sfx}", placeholder="Напр., ТОВ «Меблі-Світ»")
 
-        # Ряд 2: Вибір ролей через двоколоночний пікер
-        existing_roles_str = contact_data_to_edit.get("Роль / Категорія", "") if is_edit else ""
+        existing_roles_str = contact_data_to_edit.get("Роль / Категорія", default_role) if is_edit else default_role
         selected_roles = render_role_picker("Роль / Категорія", key_suffix=sfx, default_roles=existing_roles_str)
 
         st.markdown("---")
 
-        # Ряд 3: Телефони та Email (з корисними підказками)
         col3, col4 = st.columns(2)
         with col3:
             phone = st.text_input(
@@ -89,7 +153,7 @@ def render_contact_form(selected_sheet_id, contact_data_to_edit=None, on_success
                 key=f"phone_{sfx}",
                 placeholder="+4915123456789, +380501112233"
             )
-            st.caption("💡 У міжнародній формі, декілька — через кому")
+            st.caption("💡 У міжнародній формі, через кому")
         with col4:
             email = st.text_input(
                 "Email(и)", 
@@ -99,7 +163,6 @@ def render_contact_form(selected_sheet_id, contact_data_to_edit=None, on_success
             )
             st.caption("💡 Декілька адрес — через кому")
 
-        # Ряд 4: Telegram та Тип (Фіз./Юр.)
         col5, col6 = st.columns(2)
         with col5:
             telegram = st.text_input(
@@ -108,18 +171,16 @@ def render_contact_form(selected_sheet_id, contact_data_to_edit=None, on_success
                 key=f"telegram_{sfx}",
                 placeholder="@username1, @username2"
             )
-            st.caption("💡 З собачки (@), декілька — через кому")
+            st.caption("💡 З собачки (@), через кому")
         with col6:
             client_types = ["Фізична особа", "Юридична особа"]
             curr_type = contact_data_to_edit.get("Тип (Фіз./Юр.)", "Фізична особа") if is_edit else "Фізична особа"
             type_idx = client_types.index(curr_type) if curr_type in client_types else 0
             client_type = st.selectbox("Тип (Фіз./Юр.)", options=client_types, index=type_idx, key=f"client_type_{sfx}")
 
-        # Ряд 5: Адреса та Коментар
         address = st.text_input("Адреса / Місто", value=contact_data_to_edit.get("Адреса / Місто", "") if is_edit else "", key=f"address_{sfx}", placeholder="м. Штутгарт, вул. Штрассе, 12")
         comment = st.text_area("Коментар", value=contact_data_to_edit.get("Коментар", "") if is_edit else "", key=f"comment_{sfx}", placeholder="Будь-які додаткові нотатки...")
 
-        # Якщо це редагування — показуємо зв'язані проєкти (зчитуються динамічно з Orders)
         if is_edit:
             st.markdown("#### 🔗 Зв'язані проєкти")
             orders_data = get_orders_data(selected_sheet_id, "Orders")
@@ -127,7 +188,6 @@ def render_contact_form(selected_sheet_id, contact_data_to_edit=None, on_success
             
             linked_orders = []
             for ord_row in orders_data:
-                # Шукаємо, чи згадується ім'я контакту у полях замовлення (Замовник, Замірник тощо)
                 row_str = " ".join([str(val) for val in ord_row.values()])
                 if contact_name and contact_name.lower() in row_str.lower():
                     linked_orders.append(ord_row.get("ID Замовлення", "Н/Д") + " - " + ord_row.get("Назва замовлення", ""))
@@ -140,7 +200,6 @@ def render_contact_form(selected_sheet_id, contact_data_to_edit=None, on_success
 
         st.markdown("---")
 
-        # Кнопки збереження / скасування
         col_s1, col_s2 = st.columns(2)
         with col_s1:
             if st.button("💾 Зберегти контакт", type="primary", key=f"btn_save_{sfx}"):
@@ -161,19 +220,13 @@ def render_contact_form(selected_sheet_id, contact_data_to_edit=None, on_success
                         "Коментар": comment,
                     }
                     
-                    if is_edit:
-                        # Логіка оновлення існуючого рядка в таблиці Contacts
-                        client = st.session_state.get("gspread_client") or None
-                        # Використовуємо стандартну функцію збереження або оновлюємо
-                        success = save_new_contact(selected_sheet_id, contact_payload) # за потреби можна реалізувати update
-                    else:
-                        success = save_new_contact(selected_sheet_id, contact_payload)
+                    success = save_new_contact(selected_sheet_id, contact_payload)
                         
                     if success:
                         st.success(f"✅ Контакт '{name}' успішно збережено!")
-                        # Очищаємо стан ролей
-                        if state_key in st.session_state:
-                            del st.session_state[state_key]
+                        role_state_key = f"picked_roles_{sfx}"
+                        if role_state_key in st.session_state:
+                            del st.session_state[role_state_key]
                         if on_success:
                             on_success()
                         else:
@@ -182,8 +235,9 @@ def render_contact_form(selected_sheet_id, contact_data_to_edit=None, on_success
                         st.error("❌ Помилка збереження контакту.")
         with col_s2:
             if st.button("Скасувати", key=f"btn_cancel_{sfx}"):
-                if state_key in st.session_state:
-                    del st.session_state[state_key]
+                role_state_key = f"picked_roles_{sfx}"
+                if role_state_key in st.session_state:
+                    del st.session_state[role_state_key]
                 if on_success:
                     on_success()
                 else:
@@ -201,7 +255,6 @@ def render_contacts_view(selected_sheet_id):
 
     contacts_records = get_all_contacts_records(selected_sheet_id)
 
-    # Панель фільтрації та кнопок
     f_col1, f_col2, f_col3 = st.columns([2, 2, 2])
     with f_col1:
         search_query = st.text_input("🔍 Пошук за ім'ям / компанією", placeholder="Введіть текст...")
@@ -216,15 +269,14 @@ def render_contacts_view(selected_sheet_id):
 
     st.markdown("---")
 
-    # Якщо активовано режим додавання нового контакту
     if st.session_state.show_new_contact_modal:
         render_contact_form(
             selected_sheet_id, 
+            key_suffix="new_modal",
             on_success=lambda: setattr(st.session_state, 'show_new_contact_modal', False)
         )
         st.markdown("---")
 
-    # Якщо активовано режим редагування конкретного контакту
     if st.session_state.edit_contact_id:
         target_contact = next((c for c in contacts_records if c.get("ID Контакту") == st.session_state.edit_contact_id), None)
         if target_contact:
@@ -235,7 +287,6 @@ def render_contacts_view(selected_sheet_id):
             )
             st.markdown("---")
 
-    # Фільтрація записів
     filtered_records = []
     for row in contacts_records:
         name = str(row.get("ПІБ / Назва", ""))
@@ -251,7 +302,6 @@ def render_contacts_view(selected_sheet_id):
     if filtered_records:
         st.markdown(f"**Знайдено контактів:** {len(filtered_records)}")
         
-        # Відображення таблиці з кнопкою вибору для редагування
         for row in filtered_records:
             c_id = row.get("ID Контакту", "")
             c_name = row.get("ПІБ / Назва", "")
