@@ -5,7 +5,7 @@ from utils.sheets_service import get_all_contacts_records, save_new_contact
 ALL_ROLES = ["Замовник", "Замірник", "Дизайнер", "Конструктор", "Виробник", "Монтажник", "Інше"]
 
 
-def inject_chip_multiselect_css():
+def inject_vertical_multiselect_css():
     """CSS-стилі для горизонтального переносу тегів (чіпів) у мультивиборі."""
     st.markdown(
         """
@@ -40,7 +40,7 @@ def inject_chip_multiselect_css():
 
 def render_contact_form(selected_sheet_id, default_role="", key_suffix="default", on_success=None):
     """Повноцінна форма додавання нового контакту."""
-    inject_chip_multiselect_css()
+    inject_vertical_multiselect_css()
     
     st.info("📝 **Форма нового контакту**")
     with st.expander("Заповніть дані контакту", expanded=True):
@@ -94,7 +94,7 @@ def render_contact_form(selected_sheet_id, default_role="", key_suffix="default"
 
 def render_contacts_view(selected_sheet_id):
     """Повноцінний розділ управління контактами в меню."""
-    inject_chip_multiselect_css()
+    inject_vertical_multiselect_css()
     st.subheader("👥 Довідник контактів")
 
     if "show_new_contact_modal" not in st.session_state:
