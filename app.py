@@ -59,7 +59,7 @@ else:
         selected_db_name = list(db_options.keys())[0]
         st.sidebar.info(f"📂 Активна база:\n\n**{selected_db_name}**")
 
-    # ВИПРАВЛЕННЯ: Коректно витягуємо ID таблиці та ID папки Диску зі словника
+    # Коректно витягуємо ID таблиці та ID папки Диску зі словника
     selected_db_info = db_options[selected_db_name]
     selected_sheet_id = selected_db_info.get("sheet_id", "")
     drive_folder_id = selected_db_info.get("drive_folder_id", "")
@@ -85,5 +85,3 @@ else:
 
     elif menu == "👥 Контакти":
         render_contacts_view(selected_sheet_id)
-    elif menu == "👥 Контакти":
-        st.info("Розділ довідника контактів знаходиться в розробці.")
