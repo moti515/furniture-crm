@@ -5,8 +5,35 @@ from utils.sheets_service import get_all_contacts_records, save_new_contact
 ALL_ROLES = ["Замовник", "Замірник", "Дизайнер", "Конструктор", "Виробник", "Монтажник", "Інше"]
 
 
+def inject_vertical_multiselect_css():
+    """Глобальні CSS-стилі для вертикального вишикування тегів у мультивиборі."""
+    st.markdown(
+        """
+        <style>
+        div[data-baseweb="select"] {
+            height: auto !important;
+            min-height: 38px;
+        }
+        div[data-baseweb="select"] > div:first-child {
+            flex-direction: column !important;
+            align-items: flex-start !important;
+            height: auto !important;
+        }
+        div[data-baseweb="select"] span[data-baseweb="tag"] {
+            display: flex !important;
+            width: 100% !important;
+            margin: 3px 0 !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def render_contact_form(selected_sheet_id, default_role="", key_suffix="default", on_success=None):
-    """Багаторазова форма додавання нового контакту."""
+    """Повноцінна форма додавання нового контакту з вертикальним мультивибором ролей."""
+    inject_vertical_multiselect_css()
+    
     st.info("📝 **Форма нового контакту**")
     with st.expander("Заповніть дані контакту", expanded=True):
         new_name = st.text_input("ПІБ / Назва *", key=f"new_name_{key_suffix}")
@@ -77,7 +104,6 @@ def render_contacts_view(selected_sheet_id):
         )
         st.markdown("---")
 
-    # Відображення таблиці існуючих контактів
     contacts_records = get_all_contacts_records(selected_sheet_id)
     if contacts_records:
         df_contacts = pd.DataFrame(contacts_records)
