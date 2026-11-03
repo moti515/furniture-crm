@@ -7,34 +7,12 @@ from utils.sheets_service import (
     get_all_contacts_records,
     save_new_order,
 )
-from views.contacts_manager import render_contact_form
-
-ALL_ROLES = ["Замовник", "Замірник", "Дизайнер", "Конструктор", "Виробник", "Монтажник", "Інше"]
+from views.contacts_manager import render_contact_form, inject_vertical_multiselect_css
 
 
 def render_new_order_view(selected_sheet_id, drive_folder_id):
-    # CSS для того, щоб теги мультивибору розміщувалися строго один під другим
-    st.markdown(
-        """
-        <style>
-        div[data-baseweb="select"] {
-            height: auto !important;
-            min-height: 38px;
-        }
-        div[data-baseweb="select"] > div:first-child {
-            flex-direction: column !important;
-            align-items: flex-start !important;
-            height: auto !important;
-        }
-        div[data-baseweb="select"] span[data-baseweb="tag"] {
-            display: flex !important;
-            width: 100% !important;
-            margin: 3px 0 !important;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
+    # Викликаємо загальні стилі вертикального мультивибору
+    inject_vertical_multiselect_css()
 
     st.subheader("➕ Створення нового замовлення")
 
@@ -53,7 +31,7 @@ def render_new_order_view(selected_sheet_id, drive_folder_id):
             roles_str = str(row.get("Роль / Категорія", "")).strip()
 
             if name:
-                # Формуємо унікальний рядок з урахуванням ID, щоб не втрачати контакти з однаковими іменами
+                # Забезпечуємо унікальність за рахунок ID у мітці, навіть якщо імена однакові
                 display_label = f"{name} ({contact_id})" if contact_id else name
                 
                 if role_filter:
@@ -86,6 +64,7 @@ def render_new_order_view(selected_sheet_id, drive_folder_id):
                 st.session_state[f"show_add_{key_suffix}"] = False
                 st.rerun()
 
+            # Викликаємо форму з менеджеру контактів
             render_contact_form(
                 selected_sheet_id=selected_sheet_id,
                 default_role=role_filter,
