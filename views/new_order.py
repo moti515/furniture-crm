@@ -7,12 +7,12 @@ from utils.sheets_service import (
     get_all_contacts_records,
     save_new_order,
 )
-from views.contacts_manager import render_contact_form, inject_vertical_multiselect_css
+from views.contacts_manager import render_contact_form, inject_auto_expand_multiselect_css
 
 
 def render_new_order_view(selected_sheet_id, drive_folder_id):
     # Викликаємо загальні стилі вертикального мультивибору
-    inject_vertical_multiselect_css()
+    inject_auto_expand_multiselect_css()
 
     st.subheader("➕ Створення нового замовлення")
 
