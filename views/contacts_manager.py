@@ -16,7 +16,7 @@ def render_role_picker(label, key_suffix, default_roles=None):
     state_key = f"picked_roles_{key_suffix}"
     if state_key not in st.session_state:
         if default_roles:
-            st.session_state[state_key] = [r.strip() for r in default_roles.split(",") if r.strip()]
+            st.session_state[state_key] = [r.strip() for r in str(default_roles).split(",") if r.strip()]
         else:
             st.session_state[state_key] = []
             
@@ -128,11 +128,12 @@ def render_contact_form(selected_sheet_id, default_role="", contact_data_to_edit
     title = f"📝 Редагування контакту: {contact_data_to_edit.get('ПІБ / Назва', '')}" if is_edit else "📝 Форма нового контакту"
     
     st.info(title)
-    sfx = contact_data_to_edit.get("ID Контакту", "edit") if is_edit else key_suffix
+    sfx = str(contact_data_to_edit.get("ID Контакту", "edit")) if is_edit else key_suffix
 
     with st.expander("Детальна інформація про контакт", expanded=True):
+        contact_id = contact_data_to_edit.get("ID Контакту", "") if is_edit else ""
         if is_edit:
-            st.text_input("ID Контакту", value=contact_data_to_edit.get("ID Контакту", ""), disabled=True)
+            st.text_input("ID Контакту", value=contact_id, disabled=True)
 
         col1, col2 = st.columns(2)
         with col1:
@@ -220,6 +221,9 @@ def render_contact_form(selected_sheet_id, default_role="", contact_data_to_edit
                         "Коментар": comment,
                     }
                     
+                    if is_edit:
+                        contact_payload["ID Контакту"] = contact_id
+                        
                     success = save_new_contact(selected_sheet_id, contact_payload)
                         
                     if success:
@@ -278,7 +282,7 @@ def render_contacts_view(selected_sheet_id):
         st.markdown("---")
 
     if st.session_state.edit_contact_id:
-        target_contact = next((c for c in contacts_records if c.get("ID Контакту") == st.session_state.edit_contact_id), None)
+        target_contact = next((c for c in contacts_records if str(c.get("ID Контакту")) == str(st.session_state.edit_contact_id)), None)
         if target_contact:
             render_contact_form(
                 selected_sheet_id, 
