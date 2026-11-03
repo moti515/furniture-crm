@@ -13,6 +13,23 @@ ALL_ROLES = ["Замовник", "Замірник", "Дизайнер", "Кон
 
 
 def render_new_order_view(selected_sheet_id, drive_folder_id):
+    # Додаємо CSS для вертикального розширення multiselect при множинному виборі
+    st.markdown(
+        """
+        <style>
+        div[data-baseweb="select"] {
+            height: auto !important;
+            min-height: 38px;
+        }
+        div[data-baseweb="select"] > div {
+            height: auto !important;
+            flex-wrap: wrap !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
     st.subheader("➕ Створення нового замовлення")
 
     if "order_success_msg" in st.session_state and st.session_state.order_success_msg:
@@ -20,7 +37,6 @@ def render_new_order_view(selected_sheet_id, drive_folder_id):
         st.balloons()
         st.session_state.order_success_msg = ""
 
-    # Зчитуємо всі контакти 1 раз за запит сторінки
     all_contacts_records = get_all_contacts_records(selected_sheet_id)
 
     def filter_contacts_by_role(role_filter=""):
@@ -70,7 +86,8 @@ def render_new_order_view(selected_sheet_id, drive_folder_id):
                         default=default_roles,
                         key=f"new_roles_{key_suffix}"
                     )
-                    st.caption("💡 Для додавання інших категорій зверніться до адміністратора.")
+                    # Точна вимога щодо підказки
+                    st.caption("💡 Для додавання категорій/ролей - зверніться до адміністратора")
                     new_comment = st.text_input("Коментар", key=f"new_com_{key_suffix}")
 
                 col_s1, col_s2 = st.columns(2)
