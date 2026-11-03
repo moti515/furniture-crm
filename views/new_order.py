@@ -1,5 +1,3 @@
-from datetime import datetime
-import pandas as pd
 import streamlit as st
 from utils.drive_service import (
     create_order_folder_structure,
@@ -11,51 +9,84 @@ from utils.sheets_service import (
     save_new_contact,
 )
 
+ALL_ROLES = ["Замовник", "Замірник", "Дизайнер", "Конструктор", "Виробник", "Монтажник", "Інше"]
+
 
 def render_new_order_view(selected_sheet_id, drive_folder_id):
     st.subheader("➕ Створення нового замовлення")
 
-    # 1. Отримуємо актуальний список контактів з бази
-    contacts = get_contacts_list(selected_sheet_id)
+    # Повідомлення про успішне створення замовлення після скидання теми/форми
+    if "order_success_msg" in st.session_state and st.session_state.order_success_msg:
+        st.success(st.session_state.order_success_msg)
+        st.balloons()
+        st.session_state.order_success_msg = ""
 
-    # Допоміжна функція для вибору контакту з можливістю швидкого додавання (без st.form)
-    def contact_selector_with_add(label, key_suffix, default_role=""):
-        options = [""] + contacts + ["➕ Додати новий контакт..."]
-        selected = st.selectbox(label, options=options, key=f"sel_{key_suffix}")
+    # Допоміжна функція для вибору кількох контактів з можливістю додавання нового
+    def contact_multi_selector(label, key_suffix, role_filter=""):
+        contacts = get_contacts_list(selected_sheet_id, role_filter=role_filter)
+        
+        col_sel, col_btn = st.columns([4, 1])
+        with col_sel:
+            selected = st.multiselect(
+                label,
+                options=contacts,
+                key=f"sel_{key_suffix}"
+            )
+        with col_btn:
+            st.write(" ")
+            st.write(" ")
+            add_clicked = st.button("➕ Новий", key=f"btn_add_mode_{key_suffix}")
 
-        if selected == "➕ Додати новий контакт...":
+        if add_clicked or st.session_state.get(f"show_add_{key_suffix}", False):
+            st.session_state[f"show_add_{key_suffix}"] = True
             st.info(f"📝 **Додавання нового контакту ({label})**")
-            with st.expander(f"Заповніть дані нового контакту ({label})", expanded=True):
+            with st.expander(f"Форма контакту ({label})", expanded=True):
                 new_name = st.text_input("ПІБ / Назва *", key=f"new_name_{key_suffix}")
                 col_a, col_b = st.columns(2)
                 with col_a:
                     new_phone = st.text_input("Телефон", key=f"new_phone_{key_suffix}")
                     new_email = st.text_input("Email", key=f"new_email_{key_suffix}")
                 with col_b:
-                    new_role = st.text_input("Роль / Категорія", value=default_role, key=f"new_role_{key_suffix}")
+                    default_roles = [role_filter] if role_filter and role_filter in ALL_ROLES else []
+                    new_roles = st.multiselect(
+                        "Роль / Категорія *",
+                        options=ALL_ROLES,
+                        default=default_roles,
+                        key=f"new_roles_{key_suffix}"
+                    )
+                    st.caption("💡 Для додавання інших категорій зверніться до адміністратора.")
                     new_comment = st.text_input("Коментар", key=f"new_com_{key_suffix}")
 
-                if st.button("💾 Зберегти контакт", key=f"btn_save_contact_{key_suffix}"):
-                    if not new_name:
-                        st.error("❌ Введіть ПІБ або назву контакту.")
-                    else:
-                        contact_data = {
-                            "ПІБ / Назва": new_name,
-                            "Роль / Категорія": new_role,
-                            "Телефон(и)": new_phone,
-                            "Email(и)": new_email,
-                            "Коментар": new_comment,
-                        }
-                        success = save_new_contact(selected_sheet_id, contact_data)
-                        if success:
-                            st.success(f"✅ Контакт '{new_name}' успішно додано!")
-                            st.rerun()
+                col_s1, col_s2 = st.columns(2)
+                with col_s1:
+                    if st.button("💾 Зберегти контакт", key=f"btn_save_contact_{key_suffix}"):
+                        if not new_name:
+                            st.error("❌ Введіть ПІБ або назву контакту.")
+                        elif not new_roles:
+                            st.error("❌ Оберіть принаймні одну роль / категорію.")
                         else:
-                            st.error("❌ Помилка збереження контакту.")
-            return ""
-        return selected
+                            contact_data = {
+                                "ПІБ / Назва": new_name,
+                                "Роль / Категорія": ", ".join(new_roles),
+                                "Телефон(и)": new_phone,
+                                "Email(и)": new_email,
+                                "Коментар": new_comment,
+                            }
+                            success = save_new_contact(selected_sheet_id, contact_data)
+                            if success:
+                                st.session_state[f"show_add_{key_suffix}"] = False
+                                st.success(f"✅ Контакт '{new_name}' успішно додано!")
+                                st.rerun()
+                            else:
+                                st.error("❌ Помилка збереження контакту.")
+                with col_s2:
+                    if st.button("Скасувати", key=f"btn_cancel_{key_suffix}"):
+                        st.session_state[f"show_add_{key_suffix}"] = False
+                        st.rerun()
 
-    # 2. Завантаження ієрархії папок з Google Drive
+        return ", ".join(selected)
+
+    # 2. Сканування ієрархії Google Drive
     with st.spinner("Завантаження ієрархії папок з Google Диску..."):
         try:
             hierarchy, _ = get_drive_hierarchy(drive_folder_id)
@@ -67,7 +98,7 @@ def render_new_order_view(selected_sheet_id, drive_folder_id):
     st.markdown("### 📌 Основна інформація")
     col1, col2 = st.columns(2)
     with col1:
-        customer = contact_selector_with_add("Замовник / Представник *", "customer", "Замовник")
+        customer = contact_multi_selector("Замовник / Представник *", "customer", "Замовник")
         order_name = st.text_input(
             "Назва замовлення *",
             placeholder="Напр., Кухня фасади МДФ фарбовані",
@@ -116,14 +147,14 @@ def render_new_order_view(selected_sheet_id, drive_folder_id):
     st.markdown("### 👥 Відповідальні особи")
     col3, col4, col5 = st.columns(3)
     with col3:
-        measurer = contact_selector_with_add("Замірник", "measurer", "Замірник")
-        designer = contact_selector_with_add("Дизайнер", "designer", "Дизайнер")
+        measurer = contact_multi_selector("Замірник", "measurer", "Замірник")
+        designer = contact_multi_selector("Дизайнер", "designer", "Дизайнер")
     with col4:
-        constructor = contact_selector_with_add("Конструктор", "constructor", "Конструктор")
-        producer = contact_selector_with_add("Виробник", "producer", "Виробник")
+        constructor = contact_multi_selector("Конструктор", "constructor", "Конструктор")
+        producer = contact_multi_selector("Виробник", "producer", "Виробник")
     with col5:
-        installer = contact_selector_with_add("Монтажник", "installer", "Монтажник")
-        other_persons = st.text_input("Інші пов'язані особи", key="other_persons_val")
+        installer = contact_multi_selector("Монтажник", "installer", "Монтажник")
+        other_persons = contact_multi_selector("Інші пов'язані особи", "other_persons", "")
 
     st.markdown("---")
 
@@ -143,7 +174,6 @@ def render_new_order_view(selected_sheet_id, drive_folder_id):
     
     chk_service = st.checkbox("Сервіс і Ремонт", key="chk_s")
 
-    # Формуємо список активних типів замовлення
     active_types = []
     if chk_measuring: active_types.append("Заміри")
     if chk_design: active_types.append("Розробка дизайну")
@@ -153,10 +183,8 @@ def render_new_order_view(selected_sheet_id, drive_folder_id):
     if chk_delivery_goods: active_types.append("Поставка готових виробів і фурнітури")
     if chk_service: active_types.append("Сервіс і Ремонт")
 
-    # Словник для збереження додаткових полів етапів
     order_payload_extras = {}
 
-    # Динамічні блоки полів статусів і коментарів (реагують миттєво)
     if chk_measuring:
         st.markdown("📐 **Етап: Заміри**")
         mc1, mc2 = st.columns(2)
@@ -195,8 +223,8 @@ def render_new_order_view(selected_sheet_id, drive_folder_id):
 
     st.markdown("---")
 
-    # --- 💾 ЗБЕРЕЖЕННЯ ЗАМОВЛЕННЯ ---
-    if st.button("💾 Зберегти замовлення та створити папки на Диску", type="primary", use_container_width=True):
+    # --- 💾 ЗБЕРЕЖЕННЯ З ЗМІНЕНОЮ НАЗВОЮ КНОПКИ ---
+    if st.button("Зберегти нове замовлення", type="primary", use_container_width=True):
         if not order_name or not customer:
             st.error("❌ Будь ласка, заповніть обов'язкові поля: Замовник та Назва замовлення.")
         else:
@@ -206,14 +234,13 @@ def render_new_order_view(selected_sheet_id, drive_folder_id):
                     final_city = selected_city
                     final_object = selected_object
 
-                    temp_folder_name = f"Нове замовлення - {order_name}"
-
+                    # ПУНКТ 5: Папка на Диску створюється строго за назвою замовлення
                     folder_link = create_order_folder_structure(
                         drive_folder_id,
                         final_country,
                         final_city,
                         final_object,
-                        temp_folder_name,
+                        order_name,
                     )
 
                     order_payload = {
@@ -234,15 +261,29 @@ def render_new_order_view(selected_sheet_id, drive_folder_id):
                         "Папка на Диску": folder_link,
                     }
 
-                    # Об'єднуємо зі статусами й коментарями активованих етапів
                     order_payload.update(order_payload_extras)
 
                     new_id = save_new_order(selected_sheet_id, order_payload)
 
-                    st.success(
-                        f"✅ Замовлення **{new_id}** успішно створено!"
-                        f" [Відкрити папку на Диску]({folder_link})"
-                    )
-                    st.balloons()
+                    if new_id:
+                        # ПУНКТ 2: Повідомлення + скидання стану
+                        st.session_state.order_success_msg = f"✅ Замовлення **{new_id}** успішно створено! [Відкрити папку на Диску]({folder_link})"
+
+                        # Очищаємо ключі форми в session_state для автоматичного скидання
+                        keys_to_clear = [
+                            "order_name_val", "order_content_val", "address_val",
+                            "sel_country", "sel_city", "sel_object",
+                            "sel_customer", "sel_measurer", "sel_designer",
+                            "sel_constructor", "sel_producer", "sel_installer", "sel_other_persons",
+                            "chk_m", "chk_d", "chk_c", "chk_p", "chk_i", "chk_dg", "chk_s",
+                            "s_meas", "c_meas", "s_des", "c_des", "s_con", "c_con",
+                            "s_prod", "c_prod", "s_inst", "c_inst", "s_del", "c_del"
+                        ]
+                        for k in keys_to_clear:
+                            if k in st.session_state:
+                                del st.session_state[k]
+
+                        st.rerun()
+
                 except Exception as e:
                     st.error(f"❌ Помилка при збереженні замовлення: {e}")
