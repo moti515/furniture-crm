@@ -229,9 +229,10 @@ def render_contact_form(selected_sheet_id, default_role="", contact_data_to_edit
                         
                     if success:
                         st.success(f"✅ Контакт '{name}' успішно збережено!")
-                        # Очищаємо стани та повертаємося до таблиці
+                        # Скидаємо стани та ставимо прапорець закриття
                         st.session_state.edit_contact_id = None
                         st.session_state.show_new_contact_modal = False
+                        st.session_state.just_closed_form = True
                         if f"picked_roles_{sfx}" in st.session_state:
                             del st.session_state[f"picked_roles_{sfx}"]
                         st.rerun()
@@ -241,6 +242,7 @@ def render_contact_form(selected_sheet_id, default_role="", contact_data_to_edit
             if st.button("Скасувати", key=f"btn_cancel_{sfx}"):
                 st.session_state.edit_contact_id = None
                 st.session_state.show_new_contact_modal = False
+                st.session_state.just_closed_form = True
                 if f"picked_roles_{sfx}" in st.session_state:
                     del st.session_state[f"picked_roles_{sfx}"]
                 st.rerun()
@@ -328,6 +330,12 @@ def render_contacts_view(selected_sheet_id):
         )
 
         selected_rows = event.selection.get("rows", [])
+        
+        # Якщо ми щойно закрили або зберегли форму, ігноруємо залишкове виділення таблиці
+        if st.session_state.get("just_closed_form", False):
+            st.session_state.just_closed_form = False
+            selected_rows = []
+
         if selected_rows:
             selected_index = selected_rows[0]
             selected_contact = filtered_records[selected_index]
