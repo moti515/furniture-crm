@@ -202,31 +202,6 @@ def render_contact_form(selected_sheet_id, default_role="", contact_data_to_edit
 
         st.markdown("---")
 
-        def cleanup_and_close():
-            """Очищає стан полів форми та закриває її."""
-            keys_to_remove = [
-                f"picked_roles_{sfx}",
-                f"name_{sfx}",
-                f"company_{sfx}",
-                f"phone_{sfx}",
-                f"email_{sfx}",
-                f"telegram_{sfx}",
-                f"client_type_{sfx}",
-                f"address_{sfx}",
-                f"comment_{sfx}"
-            ]
-            for k in keys_to_remove:
-                if k in st.session_state:
-                    del st.session_state[k]
-            
-            st.session_state.edit_contact_id = None
-            st.session_state.show_new_contact_modal = False
-            
-            if on_success:
-                on_success()
-            else:
-                st.rerun()
-
         col_s1, col_s2 = st.columns(2)
         with col_s1:
             if st.button(btn_label, type="primary", key=f"btn_save_{sfx}"):
@@ -254,12 +229,21 @@ def render_contact_form(selected_sheet_id, default_role="", contact_data_to_edit
                         
                     if success:
                         st.success(f"✅ Контакт '{name}' успішно збережено!")
-                        cleanup_and_close()
+                        # Очищаємо стани та повертаємося до таблиці
+                        st.session_state.edit_contact_id = None
+                        st.session_state.show_new_contact_modal = False
+                        if f"picked_roles_{sfx}" in st.session_state:
+                            del st.session_state[f"picked_roles_{sfx}"]
+                        st.rerun()
                     else:
                         st.error("❌ Помилка збереження контакту.")
         with col_s2:
             if st.button("Скасувати", key=f"btn_cancel_{sfx}"):
-                cleanup_and_close()
+                st.session_state.edit_contact_id = None
+                st.session_state.show_new_contact_modal = False
+                if f"picked_roles_{sfx}" in st.session_state:
+                    del st.session_state[f"picked_roles_{sfx}"]
+                st.rerun()
 
 
 def render_contacts_view(selected_sheet_id):
@@ -299,14 +283,9 @@ def render_contacts_view(selected_sheet_id):
     st.markdown("---")
 
     if st.session_state.show_new_contact_modal:
-        def _close_new():
-            st.session_state.show_new_contact_modal = False
-            st.rerun()
-
         render_contact_form(
             selected_sheet_id, 
-            key_suffix="new_modal",
-            on_success=_close_new
+            key_suffix="new_modal"
         )
         st.markdown("---")
 
@@ -368,12 +347,7 @@ def render_contacts_view(selected_sheet_id):
         )
         if target_contact:
             st.markdown("---")
-            def _close_edit():
-                st.session_state.edit_contact_id = None
-                st.rerun()
-
             render_contact_form(
                 selected_sheet_id, 
-                contact_data_to_edit=target_contact, 
-                on_success=_close_edit
+                contact_data_to_edit=target_contact
             )
