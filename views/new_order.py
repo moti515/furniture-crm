@@ -29,16 +29,17 @@ def render_new_order_view(selected_sheet_id, drive_folder_id):
 
     st.markdown("### 📌 Основна інформація")
     
-    # Використовуємо кастомні стилі для виділення заголовків полів
     label_style = "font-size: 1.05rem; font-weight: 700; margin-bottom: 0.3rem; display: block;"
 
     col1, col2 = st.columns(2)
     with col1:
-        st.markdown(f'<span style="{label_style}">Замовник / Представник *</span>', unsafe_allow_html=True)
-        customer = render_contact_picker(
-            "", "customer", "Замовник", 
-            selected_sheet_id=selected_sheet_id, all_contacts_records=all_contacts_records
-        )
+        # Загортаємо вибір замовника у єдиний візуальний контейнер з рамкою
+        with st.container(border=True):
+            st.markdown(f'<span style="{label_style}">Замовник / Представник *</span>', unsafe_allow_html=True)
+            customer = render_contact_picker(
+                "", "customer", "Замовник", 
+                selected_sheet_id=selected_sheet_id, all_contacts_records=all_contacts_records
+            )
         
         st.markdown(f'<span style="{label_style}">Назва замовлення *</span>', unsafe_allow_html=True)
         order_name = st.text_input(
