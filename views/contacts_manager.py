@@ -9,9 +9,11 @@ from utils.sheets_service import (
 ALL_ROLES = ["Замовник", "Замірник", "Дизайнер", "Конструктор", "Виробник", "Монтажник", "Інше"]
 
 
-def render_role_picker(label, key_suffix, default_roles=None):
-    """Двоколоночний компонент вибору ролей / категорій всередині форми контакту."""
-    st.markdown(f"**{label} *:**")
+def render_contact_picker(label, key_suffix, role_filter="", selected_sheet_id=None, all_contacts_records=None):
+    """Двоколоночний інтерактивний компонент вибору контактів для форми замовлення."""
+    # Замінюємо звичайну зірочку на безпечну або підсвічуємо її червоним
+    formatted_label = label.replace("*", '<span style="color: red; font-weight: bold;">*</span>')
+    st.markdown(f"**{formatted_label}**", unsafe_allow_html=True)
     
     state_key = f"picked_roles_{key_suffix}"
     if state_key not in st.session_state:
