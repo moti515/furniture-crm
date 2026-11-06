@@ -34,7 +34,7 @@ def render_new_order_view(selected_sheet_id, drive_folder_id):
     # Розтягуємо основну інформацію на всю ширину екрана (без стовпців)
     with st.container(border=True):
         customer = render_contact_picker(
-            "Замовник / Представник *", "customer", "Замовник", 
+            "Замовник / Представник", "customer", "Замовник", 
             selected_sheet_id=selected_sheet_id, all_contacts_records=all_contacts_records
         )
     
