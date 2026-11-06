@@ -326,7 +326,7 @@ def render_contacts_view(selected_sheet_id):
         display_columns = [col for col in df.columns if col != "ID Контакту"]
         df_display = df[display_columns]
 
-        st.caption("💡 **Порада:** Клікніть на будь-який рядок у таблиці нижче, щоб відкрити його для редагування.")
+        st.caption("💡 **Порада:** Відмітьте галочкою будь-який рядок у таблиці нижче, щоб відкрити повну інформацію а також для редагування.")
         
         event = st.dataframe(
             df_display,
