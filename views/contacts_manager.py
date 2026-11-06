@@ -258,7 +258,7 @@ def render_contact_form(selected_sheet_id, default_role="", contact_data_to_edit
 
 
 def render_contacts_view(selected_sheet_id):
-    """Розділ контактів у форматі інтерактивної інспекційної таблиці (st.dataframe)."""
+    """Розділ контактів у форматі інтерактивної таблиці."""
     st.markdown(
         """
         <style>
@@ -286,14 +286,13 @@ def render_contacts_view(selected_sheet_id):
         role_filter = st.selectbox("Фільтр за роллю", options=["Всі ролі"] + ALL_ROLES)
     with f_col3:
         if not st.session_state.show_new_contact_modal and not st.session_state.edit_contact_id:
-            if st.button("➕ Додати новий контакт", type="primary", use_container_width=True):
+            if st.button("➕ Додати новий контакт", type="primary", width="stretch"):
                 st.session_state.show_new_contact_modal = True
                 st.session_state.edit_contact_id = None
                 st.rerun()
 
     st.markdown("---")
 
-    # Перевірка виклику модального вікна створення контакту
     if st.session_state.show_new_contact_modal:
         render_contact_form(
             selected_sheet_id, 
@@ -302,7 +301,6 @@ def render_contacts_view(selected_sheet_id):
         )
         st.markdown("---")
 
-    # Фільтрація записів
     filtered_records = []
     for row in contacts_records:
         name = str(row.get("ПІБ / Назва", ""))
@@ -325,23 +323,19 @@ def render_contacts_view(selected_sheet_id):
 
     if filtered_records:
         df = pd.DataFrame(filtered_records)
-        
-        # Ховаємо колонку з ID Контакту для відвідувача, залишаючи лише корисні стовпчики
         display_columns = [col for col in df.columns if col != "ID Контакту"]
         df_display = df[display_columns]
 
         st.caption("💡 **Порада:** Клікніть на будь-який рядок у таблиці нижче, щоб відкрити його для редагування.")
         
-        # Інтерактивна таблиця з підсвічуванням вибраного рядка
         event = st.dataframe(
             df_display,
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
             on_select="rerun",
             selection_mode="single-row"
         )
 
-        # Отримуємо виділений рядок із таблиці
         selected_rows = event.selection.get("rows", [])
         if selected_rows:
             selected_index = selected_rows[0]
@@ -355,7 +349,6 @@ def render_contacts_view(selected_sheet_id):
     else:
         st.info("Контактів за вашим запитом не знайдено.")
 
-    # Відображення форми редагування, якщо контакт обрано у таблиці
     if st.session_state.edit_contact_id:
         target_contact = next(
             (c for c in contacts_records if str(c.get("ID Контакту")) == str(st.session_state.edit_contact_id)), 
