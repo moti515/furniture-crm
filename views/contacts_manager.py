@@ -258,31 +258,12 @@ def render_contact_form(selected_sheet_id, default_role="", contact_data_to_edit
 
 
 def render_contacts_view(selected_sheet_id):
-    """Повноцінний розділ управління контактами у вигляді чистої мінімалістичної таблиці."""
+    """Розділ контактів у форматі інтерактивної інспекційної таблиці (st.dataframe)."""
     st.markdown(
         """
         <style>
         div.stButton > button {
             margin-top: 28px !important;
-        }
-        /* Стилізація єдиної таблиці для мінімальних відступів */
-        .contact-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 10px;
-        }
-        .contact-table th {
-            text-align: left;
-            padding: 8px 12px;
-            color: #555;
-            font-size: 13px;
-            border-bottom: 2px solid #ddd;
-        }
-        .contact-table td {
-            padding: 8px 12px;
-            font-size: 14px;
-            border-bottom: 1px solid #eee;
-            vertical-align: middle;
         }
         </style>
         """,
@@ -307,10 +288,12 @@ def render_contacts_view(selected_sheet_id):
         if not st.session_state.show_new_contact_modal and not st.session_state.edit_contact_id:
             if st.button("➕ Додати новий контакт", type="primary", use_container_width=True):
                 st.session_state.show_new_contact_modal = True
+                st.session_state.edit_contact_id = None
                 st.rerun()
 
     st.markdown("---")
 
+    # Перевірка виклику модального вікна створення контакту
     if st.session_state.show_new_contact_modal:
         render_contact_form(
             selected_sheet_id, 
@@ -319,20 +302,7 @@ def render_contacts_view(selected_sheet_id):
         )
         st.markdown("---")
 
-    if st.session_state.edit_contact_id:
-        target_contact = next((c for c in contacts_records if str(c.get("ID Контакту")) == str(st.session_state.edit_contact_id)), None)
-        if target_contact:
-            def _close_edit():
-                st.session_state.edit_contact_id = None
-                st.rerun()
-
-            render_contact_form(
-                selected_sheet_id, 
-                contact_data_to_edit=target_contact, 
-                on_success=_close_edit
-            )
-            st.markdown("---")
-
+    # Фільтрація записів
     filtered_records = []
     for row in contacts_records:
         name = str(row.get("ПІБ / Назва", ""))
@@ -354,33 +324,51 @@ def render_contacts_view(selected_sheet_id):
             filtered_records.append(row)
 
     if filtered_records:
-        st.markdown(f"**Знайдено контактів:** {len(filtered_records)}")
+        df = pd.DataFrame(filtered_records)
         
-        # Для виведення кнопок без зайвих зазорів використовуємо гібридний рядковий підхід Streamlit:
-        for idx, row in enumerate(filtered_records):
-            c_id = row.get("ID Контакту", "")
-            c_name = row.get("ПІБ / Назва", "")
-            c_roles = row.get("Роль / Категорія", "")
-            c_phone = row.get("Телефон(и)", "")
-            c_comp = row.get("Компанія", "")
+        # Ховаємо колонку з ID Контакту для відвідувача, залишаючи лише корисні стовпчики
+        display_columns = [col for col in df.columns if col != "ID Контакту"]
+        df_display = df[display_columns]
 
-            # Використовуємо ультракомпактний контейнер без розділювачів-divider
-            cols = st.columns([2.5, 2.5, 2, 2, 1])
-            with cols[0]:
-                st.markdown(f"**{c_name}**")
-            with cols[1]:
-                st.markdown(f"<span style='color: #444; font-size: 13px;'>{c_roles or '—'}</span>", unsafe_allow_html=True)
-            with cols[2]:
-                st.markdown(f"<span style='color: #444; font-size: 13px;'>{c_phone or '—'}</span>", unsafe_allow_html=True)
-            with cols[3]:
-                st.markdown(f"<span style='color: #444; font-size: 13px;'>{c_comp or '—'}</span>", unsafe_allow_html=True)
-            with cols[4]:
-                if st.button("✏️", key=f"edit_btn_{c_id}_{idx}", help="Редагувати контакт"):
-                    st.session_state.edit_contact_id = c_id
-                    st.session_state.show_new_contact_modal = False
-                    st.rerun()
-            
-            # Тонка лінія з мінімальним відступом
-            st.markdown("<div style='margin: 0px 0px 4px 0px; border-bottom: 1px solid #f0f2f6;'></div>", unsafe_allow_html=True)
+        st.caption("💡 **Порада:** Клікніть на будь-який рядок у таблиці нижче, щоб відкрити його для редагування.")
+        
+        # Інтерактивна таблиця з підсвічуванням вибраного рядка
+        event = st.dataframe(
+            df_display,
+            use_container_width=True,
+            hide_index=True,
+            on_select="rerun",
+            selection_mode="single-row"
+        )
+
+        # Отримуємо виділений рядок із таблиці
+        selected_rows = event.selection.get("rows", [])
+        if selected_rows:
+            selected_index = selected_rows[0]
+            selected_contact = filtered_records[selected_index]
+            selected_id = selected_contact.get("ID Контакту")
+
+            if st.session_state.edit_contact_id != selected_id:
+                st.session_state.edit_contact_id = selected_id
+                st.session_state.show_new_contact_modal = False
+                st.rerun()
     else:
         st.info("Контактів за вашим запитом не знайдено.")
+
+    # Відображення форми редагування, якщо контакт обрано у таблиці
+    if st.session_state.edit_contact_id:
+        target_contact = next(
+            (c for c in contacts_records if str(c.get("ID Контакту")) == str(st.session_state.edit_contact_id)), 
+            None
+        )
+        if target_contact:
+            st.markdown("---")
+            def _close_edit():
+                st.session_state.edit_contact_id = None
+                st.rerun()
+
+            render_contact_form(
+                selected_sheet_id, 
+                contact_data_to_edit=target_contact, 
+                on_success=_close_edit
+            )
