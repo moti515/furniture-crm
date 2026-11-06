@@ -202,6 +202,31 @@ def render_contact_form(selected_sheet_id, default_role="", contact_data_to_edit
 
         st.markdown("---")
 
+        def cleanup_and_close():
+            """Очищає стан полів форми та закриває її."""
+            keys_to_remove = [
+                f"picked_roles_{sfx}",
+                f"name_{sfx}",
+                f"company_{sfx}",
+                f"phone_{sfx}",
+                f"email_{sfx}",
+                f"telegram_{sfx}",
+                f"client_type_{sfx}",
+                f"address_{sfx}",
+                f"comment_{sfx}"
+            ]
+            for k in keys_to_remove:
+                if k in st.session_state:
+                    del st.session_state[k]
+            
+            st.session_state.edit_contact_id = None
+            st.session_state.show_new_contact_modal = False
+            
+            if on_success:
+                on_success()
+            else:
+                st.rerun()
+
         col_s1, col_s2 = st.columns(2)
         with col_s1:
             if st.button(btn_label, type="primary", key=f"btn_save_{sfx}"):
@@ -229,32 +254,12 @@ def render_contact_form(selected_sheet_id, default_role="", contact_data_to_edit
                         
                     if success:
                         st.success(f"✅ Контакт '{name}' успішно збережено!")
-                        role_state_key = f"picked_roles_{sfx}"
-                        if role_state_key in st.session_state:
-                            del st.session_state[role_state_key]
-
-                        st.session_state.edit_contact_id = None
-                        st.session_state.show_new_contact_modal = False
-
-                        if on_success:
-                            on_success()
-                        else:
-                            st.rerun()
+                        cleanup_and_close()
                     else:
                         st.error("❌ Помилка збереження контакту.")
         with col_s2:
             if st.button("Скасувати", key=f"btn_cancel_{sfx}"):
-                role_state_key = f"picked_roles_{sfx}"
-                if role_state_key in st.session_state:
-                    del st.session_state[role_state_key]
-
-                st.session_state.edit_contact_id = None
-                st.session_state.show_new_contact_modal = False
-
-                if on_success:
-                    on_success()
-                else:
-                    st.rerun()
+                cleanup_and_close()
 
 
 def render_contacts_view(selected_sheet_id):
@@ -293,7 +298,6 @@ def render_contacts_view(selected_sheet_id):
 
     st.markdown("---")
 
-    # Відображення форми створення нового контакту з обробником закриття
     if st.session_state.show_new_contact_modal:
         def _close_new():
             st.session_state.show_new_contact_modal = False
@@ -328,11 +332,8 @@ def render_contacts_view(selected_sheet_id):
 
     if filtered_records:
         df = pd.DataFrame(filtered_records)
-        
-        # Примусове переведення всіх колонок у рядковий формат для запобігання OverflowError
         df = df.astype(str)
         
-        # Список стовпчиків, які ПРИХОВУЮТЬСЯ в основній таблиці
         hidden_columns = ["ID Контакту", "Email(и)", "Нік Telegram", "Коментар"]
         display_columns = [col for col in df.columns if col not in hidden_columns]
         df_display = df[display_columns]
