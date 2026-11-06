@@ -293,11 +293,16 @@ def render_contacts_view(selected_sheet_id):
 
     st.markdown("---")
 
+    # Відображення форми створення нового контакту з обробником закриття
     if st.session_state.show_new_contact_modal:
+        def _close_new():
+            st.session_state.show_new_contact_modal = False
+            st.rerun()
+
         render_contact_form(
             selected_sheet_id, 
             key_suffix="new_modal",
-            on_success=lambda: setattr(st.session_state, 'show_new_contact_modal', False)
+            on_success=_close_new
         )
         st.markdown("---")
 
@@ -323,6 +328,9 @@ def render_contacts_view(selected_sheet_id):
 
     if filtered_records:
         df = pd.DataFrame(filtered_records)
+        
+        # Примусове переведення всіх колонок у рядковий формат для запобігання OverflowError
+        df = df.astype(str)
         
         # Список стовпчиків, які ПРИХОВУЮТЬСЯ в основній таблиці
         hidden_columns = ["ID Контакту", "Email(и)", "Нік Telegram", "Коментар"]
