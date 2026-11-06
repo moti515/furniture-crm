@@ -323,7 +323,10 @@ def render_contacts_view(selected_sheet_id):
 
     if filtered_records:
         df = pd.DataFrame(filtered_records)
-        display_columns = [col for col in df.columns if col != "ID Контакту"]
+        
+        # Список стовпчиків, які ПРИХОВУЮТЬСЯ в основній таблиці
+        hidden_columns = ["ID Контакту", "Email(и)", "Нік Telegram", "Коментар"]
+        display_columns = [col for col in df.columns if col not in hidden_columns]
         df_display = df[display_columns]
 
         st.caption("💡 **Порада:** Відмітьте галочкою будь-який рядок у таблиці нижче, щоб відкрити повну інформацію а також для редагування.")
