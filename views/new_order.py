@@ -33,7 +33,7 @@ def render_new_order_view(selected_sheet_id, drive_folder_id):
 
     col1, col2 = st.columns(2)
     with col1:
-        # Загортаємо вибір замовника у єдиний візуальний контейнер з рамкою та прибираємо внутрішній відступ/лінію
+        # Блок замовника у єдиному контейнері з рамкою
         with st.container(border=True):
             st.markdown(f'<span style="{label_style}">Замовник / Представник *</span>', unsafe_allow_html=True)
             customer = render_contact_picker(
@@ -91,14 +91,20 @@ def render_new_order_view(selected_sheet_id, drive_folder_id):
     st.markdown("### 👥 Відповідальні особи")
     col3, col4, col5 = st.columns(3)
     with col3:
-        measurer = render_contact_picker("Замірник", "measurer", "Замірник", selected_sheet_id=selected_sheet_id, all_contacts_records=all_contacts_records)
-        designer = render_contact_picker("Дизайнер", "designer", "Дизайнер", selected_sheet_id=selected_sheet_id, all_contacts_records=all_contacts_records)
+        with st.container(border=True):
+            measurer = render_contact_picker("Замірник", "measurer", "Замірник", selected_sheet_id=selected_sheet_id, all_contacts_records=all_contacts_records)
+        with st.container(border=True):
+            designer = render_contact_picker("Дизайнер", "designer", "Дизайнер", selected_sheet_id=selected_sheet_id, all_contacts_records=all_contacts_records)
     with col4:
-        constructor = render_contact_picker("Конструктор", "constructor", "Конструктор", selected_sheet_id=selected_sheet_id, all_contacts_records=all_contacts_records)
-        producer = render_contact_picker("Виробник", "producer", "Виробник", selected_sheet_id=selected_sheet_id, all_contacts_records=all_contacts_records)
+        with st.container(border=True):
+            constructor = render_contact_picker("Конструктор", "constructor", "Конструктор", selected_sheet_id=selected_sheet_id, all_contacts_records=all_contacts_records)
+        with st.container(border=True):
+            producer = render_contact_picker("Виробник", "producer", "Виробник", selected_sheet_id=selected_sheet_id, all_contacts_records=all_contacts_records)
     with col5:
-        installer = render_contact_picker("Монтажник", "installer", "Монтажник", selected_sheet_id=selected_sheet_id, all_contacts_records=all_contacts_records)
-        other_persons = render_contact_picker("Інші пов'язані особи", "other_persons", "", selected_sheet_id=selected_sheet_id, all_contacts_records=all_contacts_records)
+        with st.container(border=True):
+            installer = render_contact_picker("Монтажник", "installer", "Монтажник", selected_sheet_id=selected_sheet_id, all_contacts_records=all_contacts_records)
+        with st.container(border=True):
+            other_persons = render_contact_picker("Інші пов'язані особи", "other_persons", "", selected_sheet_id=selected_sheet_id, all_contacts_records=all_contacts_records)
 
     st.markdown("---")
 
