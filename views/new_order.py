@@ -35,9 +35,8 @@ def render_new_order_view(selected_sheet_id, drive_folder_id):
     with col1:
         # Блок замовника у єдиному контейнері з рамкою
         with st.container(border=True):
-            st.markdown(f'<span style="{label_style}">Замовник / Представник *</span>', unsafe_allow_html=True)
             customer = render_contact_picker(
-                "", "customer", "Замовник", 
+                "Замовник / Представник *", "customer", "Замовник", 
                 selected_sheet_id=selected_sheet_id, all_contacts_records=all_contacts_records
             )
         
