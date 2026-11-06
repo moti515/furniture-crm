@@ -33,7 +33,7 @@ def render_new_order_view(selected_sheet_id, drive_folder_id):
 
     col1, col2 = st.columns(2)
     with col1:
-        # Загортаємо вибір замовника у єдиний візуальний контейнер з рамкою
+        # Загортаємо вибір замовника у єдиний візуальний контейнер з рамкою та прибираємо внутрішній відступ/лінію
         with st.container(border=True):
             st.markdown(f'<span style="{label_style}">Замовник / Представник *</span>', unsafe_allow_html=True)
             customer = render_contact_picker(
