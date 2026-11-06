@@ -229,10 +229,10 @@ def render_contact_form(selected_sheet_id, default_role="", contact_data_to_edit
                         
                     if success:
                         st.success(f"✅ Контакт '{name}' успішно збережено!")
-                        # Скидаємо стани та ставимо прапорець закриття
+                        # Повністю очищаємо стан редагування та скидаємо виділення таблиці
                         st.session_state.edit_contact_id = None
                         st.session_state.show_new_contact_modal = False
-                        st.session_state.just_closed_form = True
+                        st.session_state.table_form_nonce = st.session_state.get("table_form_nonce", 0) + 1
                         if f"picked_roles_{sfx}" in st.session_state:
                             del st.session_state[f"picked_roles_{sfx}"]
                         st.rerun()
@@ -242,7 +242,7 @@ def render_contact_form(selected_sheet_id, default_role="", contact_data_to_edit
             if st.button("Скасувати", key=f"btn_cancel_{sfx}"):
                 st.session_state.edit_contact_id = None
                 st.session_state.show_new_contact_modal = False
-                st.session_state.just_closed_form = True
+                st.session_state.table_form_nonce = st.session_state.get("table_form_nonce", 0) + 1
                 if f"picked_roles_{sfx}" in st.session_state:
                     del st.session_state[f"picked_roles_{sfx}"]
                 st.rerun()
@@ -267,6 +267,8 @@ def render_contacts_view(selected_sheet_id):
         st.session_state.edit_contact_id = None
     if "show_new_contact_modal" not in st.session_state:
         st.session_state.show_new_contact_modal = False
+    if "table_form_nonce" not in st.session_state:
+        st.session_state.table_form_nonce = 0
 
     contacts_records = get_all_contacts_records(selected_sheet_id)
 
@@ -321,20 +323,19 @@ def render_contacts_view(selected_sheet_id):
 
         st.caption("💡 **Порада:** Відмітьте галочкою будь-який рядок у таблиці нижче, щоб відкрити повну інформацію а також для редагування.")
         
+        # Динамічний ключ key генерує абсолютно новий екземпляр таблиці при закритті форми, що гарантовано скидає галочки виділення
+        table_key = f"contacts_table_{st.session_state.table_form_nonce}"
+        
         event = st.dataframe(
             df_display,
             width="stretch",
             hide_index=True,
             on_select="rerun",
-            selection_mode="single-row"
+            selection_mode="single-row",
+            key=table_key
         )
 
         selected_rows = event.selection.get("rows", [])
-        
-        # Якщо ми щойно закрили або зберегли форму, ігноруємо залишкове виділення таблиці
-        if st.session_state.get("just_closed_form", False):
-            st.session_state.just_closed_form = False
-            selected_rows = []
 
         if selected_rows:
             selected_index = selected_rows[0]
