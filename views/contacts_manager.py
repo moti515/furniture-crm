@@ -229,9 +229,16 @@ def render_contact_form(selected_sheet_id, default_role="", contact_data_to_edit
                         
                     if success:
                         st.success(f"✅ Контакт '{name}' успішно збережено!")
-                        # Повністю очищаємо стан редагування та скидаємо виділення таблиці
+                        
+                        # Закриваємо модальні вікна/інлайн форми створення
                         st.session_state.edit_contact_id = None
                         st.session_state.show_new_contact_modal = False
+                        
+                        # Шукаємо та вимикаємо інлайн-форми створення контакту для пікерів у замовленнях
+                        for k in list(st.session_state.keys()):
+                            if k.startswith("show_add_"):
+                                st.session_state[k] = False
+                                
                         st.session_state.table_form_nonce = st.session_state.get("table_form_nonce", 0) + 1
                         if f"picked_roles_{sfx}" in st.session_state:
                             del st.session_state[f"picked_roles_{sfx}"]
@@ -242,11 +249,13 @@ def render_contact_form(selected_sheet_id, default_role="", contact_data_to_edit
             if st.button("Скасувати", key=f"btn_cancel_{sfx}"):
                 st.session_state.edit_contact_id = None
                 st.session_state.show_new_contact_modal = False
+                for k in list(st.session_state.keys()):
+                    if k.startswith("show_add_"):
+                        st.session_state[k] = False
                 st.session_state.table_form_nonce = st.session_state.get("table_form_nonce", 0) + 1
                 if f"picked_roles_{sfx}" in st.session_state:
                     del st.session_state[f"picked_roles_{sfx}"]
                 st.rerun()
-
 
 def render_contacts_view(selected_sheet_id):
     """Розділ контактів у форматі інтерактивної таблиці."""
