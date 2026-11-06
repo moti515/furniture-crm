@@ -28,23 +28,33 @@ def render_new_order_view(selected_sheet_id, drive_folder_id):
             hierarchy = {}
 
     st.markdown("### 📌 Основна інформація")
+    
+    # Використовуємо кастомні стилі для виділення заголовків полів
+    label_style = "font-size: 1.05rem; font-weight: 700; margin-bottom: 0.3rem; display: block;"
+
     col1, col2 = st.columns(2)
     with col1:
+        st.markdown(f'<span style="{label_style}">Замовник / Представник *</span>', unsafe_allow_html=True)
         customer = render_contact_picker(
-            "Замовник / Представник *", "customer", "Замовник", 
+            "", "customer", "Замовник", 
             selected_sheet_id=selected_sheet_id, all_contacts_records=all_contacts_records
         )
+        
+        st.markdown(f'<span style="{label_style}">Назва замовлення *</span>', unsafe_allow_html=True)
         order_name = st.text_input(
             "Назва замовлення *",
             placeholder="Напр., Кухня фасади МДФ фарбовані",
-            key="order_name_val"
+            key="order_name_val",
+            label_visibility="collapsed"
         )
-    with col2:
+        
+        st.markdown(f'<span style="{label_style}">Суть/Зміст замовлення</span>', unsafe_allow_html=True)
         order_content = st.text_area(
             "Суть/Зміст замовлення",
             placeholder="Детальний опис того, що саме необхідно зробити...",
             height=125,
-            key="order_content_val"
+            key="order_content_val",
+            label_visibility="collapsed"
         )
 
     st.markdown("---")
