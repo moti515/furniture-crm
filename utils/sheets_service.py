@@ -10,8 +10,9 @@ def get_gspread_client():
     return gspread.service_account_from_dict(creds_dict)
 
 
+@st.cache_data(ttl=60)
 def get_orders_data(spreadsheet_id: str, sheet_name: str = "Orders"):
-    """Отримує всі рядки з вказаного аркуша у вигляді списку словників."""
+    """Отримує всі рядки з вказаного аркуша у вигляді списку словників із кешуванням на 60 сек."""
     client = get_gspread_client()
     try:
         sh = client.open_by_key(spreadsheet_id)
@@ -22,9 +23,9 @@ def get_orders_data(spreadsheet_id: str, sheet_name: str = "Orders"):
         return []
 
 
-@st.cache_data(ttl=30)
+@st.cache_data(ttl=60)
 def get_all_contacts_records(spreadsheet_id: str) -> list:
-    """Зчитує всі записи з аркуша Contacts один раз і кешує на 30 секунд."""
+    """Зчитує всі записи з аркуша Contacts один раз і кешує на 60 секунд."""
     client = get_gspread_client()
     try:
         sh = client.open_by_key(spreadsheet_id)
@@ -87,6 +88,9 @@ def save_new_order(spreadsheet_id: str, order_data: dict) -> str:
         final_row = [str(full_data.get(h, "")) for h in headers]
 
         worksheet.append_row(final_row)
+        
+        # Скидаємо кеш лише для замовлень
+        get_orders_data.clear()
         return order_id
 
     except Exception as e:
@@ -141,7 +145,8 @@ def save_new_contact(spreadsheet_id: str, contact_data: dict) -> bool:
             final_row = [str(full_data.get(h, "")) for h in headers]
             worksheet.append_row(final_row)
 
-        st.cache_data.clear()
+        # Скидаємо кеш ТОЧКОВО лише для контактів
+        get_all_contacts_records.clear()
         return True
 
     except Exception as e:
