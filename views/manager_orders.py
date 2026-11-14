@@ -107,14 +107,13 @@ def _find_contact_record(contact_label: str, all_contacts_records: list[dict]) -
             return rec
         if name_part and rec_name.lower() == name_part.lower():
             return rec
-    # Якщо контакту немає в довіднику — повертаємо мінімальний шаблон для перегляду/створення
     return {
         "ID Контакту": id_part,
         "ПІБ / Назва": name_part or contact_label,
     }
 
 
-def _sync_picked_contacts_from_order(order_row: dict, force: bool = False):
+def _sync_picked_contacts_from_order(order_row: dict, order_id: str, force: bool = False):
     """Заповнює session_state для render_contact_picker значеннями з поточного замовлення."""
     mapping = {
         "customer": "Замовник / Представник",
@@ -126,7 +125,7 @@ def _sync_picked_contacts_from_order(order_row: dict, force: bool = False):
         "other_persons": "Інші пов'язані особи",
     }
     for suffix, col_name in mapping.items():
-        st_key = f"picked_contacts_{suffix}"
+        st_key = f"picked_contacts_edit_{suffix}_{order_id}"
         if force or st_key not in st.session_state:
             st.session_state[st_key] = _parse_contact_list(order_row.get(col_name, ""))
 
@@ -163,7 +162,6 @@ def _render_linked_persons_bar(order_row: dict, all_contacts_records: list[dict]
                 st.session_state.active_linked_contact_label = person_label
                 st.rerun()
 
-    # Якщо користувач натиснув на пов'язану особу — відкриваємо форму редагування контакту
     active_label = st.session_state.get("active_linked_contact_label")
     if active_label:
         st.markdown("---")
@@ -186,7 +184,7 @@ def _render_linked_persons_bar(order_row: dict, all_contacts_records: list[dict]
             render_contact_form(
                 selected_sheet_id=selected_sheet_id,
                 contact_data_to_edit=contact_rec if has_real_id else None,
-                default_role="" if has_real_id else "",
+                default_role="",
                 key_suffix=f"linked_order_{active_label}",
                 on_success=_on_contact_done,
             )
@@ -214,14 +212,12 @@ def _render_order_edit_form(
             st.session_state.orders_table_nonce = st.session_state.get("orders_table_nonce", 0) + 1
             st.rerun()
 
-    # Посилання на папку Google Диску — активне та відкривається в новій вкладці
     folder_url = str(order_row.get("Папка на Диску", "")).strip()
     if folder_url:
         st.link_button("📂 Відкрити папку замовлення на Google Диску", folder_url)
     else:
         st.caption("📂 Посилання на папку Google Диску відсутнє.")
 
-    # Активні пов'язані особи (клік відкриває форму редагування контакту)
     _render_linked_persons_bar(order_row, all_contacts_records, selected_sheet_id)
 
     st.markdown("---")
@@ -511,7 +507,6 @@ def _render_order_edit_form(
                 key=f"edit_c_del_{order_id}",
             )
 
-    # Усі інші колонки з таблиці Orders, які не входять до стандартних секцій
     extra_table_fields = [k for k in order_row.keys() if k not in STANDARD_FORM_FIELDS]
     if extra_table_fields:
         st.markdown("---")
@@ -603,7 +598,6 @@ def render_manager_orders_view(selected_sheet_id: str, drive_folder_id: str):
         st.info("У цій базі замовлення відсутні або аркуш 'Orders' порожній.")
         return
 
-    # --- ВЕРХНІЙ БЛОК ФІЛЬТРІВ ---
     top_f1, top_f2, top_f3 = st.columns([1.5, 2, 2])
     with top_f1:
         archive_mode = st.selectbox(
@@ -633,8 +627,6 @@ def render_manager_orders_view(selected_sheet_id: str, drive_folder_id: str):
             key="mgr_customer_filter",
         )
 
-    # --- КАСКАДНИЙ ФІЛЬТР КРАЇНА -> МІСТО -> ОБ'ЄКТ ---
-    # Спочатку фільтруємо за архівом та замовником, щоб каскад показував релевантні значення
     pre_filtered = []
     for row in raw_orders:
         is_arch = _is_archived_order(row)
@@ -688,7 +680,6 @@ def render_manager_orders_view(selected_sheet_id: str, drive_folder_id: str):
         o_index = obj_opts.index(prev_obj) if prev_obj in obj_opts else 0
         sel_object = st.selectbox("🏢 Назва об'єкта", options=obj_opts, index=o_index, key="mgr_object_filter")
 
-    # Фінальна фільтрація таблиці
     filtered_orders = []
     q_lower = search_query.strip().lower()
     for row in after_city:
@@ -739,19 +730,19 @@ def render_manager_orders_view(selected_sheet_id: str, drive_folder_id: str):
             if st.session_state.edit_order_id != selected_order_id:
                 st.session_state.edit_order_id = selected_order_id
                 st.session_state.active_linked_contact_label = None
-                _sync_picked_contacts_from_order(selected_order, force=True)
+                _sync_picked_contacts_from_order(selected_order, selected_order_id, force=True)
                 st.rerun()
     else:
         st.info("Замовлень за заданими умовами фільтрації не знайдено.")
 
-    # --- ФОРМА РЕДАГУВАННЯ ОБРАНОГО ЗАМОВЛЕННЯ ---
     if st.session_state.edit_order_id:
         target_order = next(
             (r for r in raw_orders if str(r.get("ID Замовлення", "")).strip() == st.session_state.edit_order_id),
             None,
         )
         if target_order:
-            _sync_picked_contacts_from_order(target_order, force=False)
+            target_id = str(target_order.get("ID Замовлення", "")).strip()
+            _sync_picked_contacts_from_order(target_order, target_id, force=False)
             _render_order_edit_form(
                 order_row=target_order,
                 selected_sheet_id=selected_sheet_id,
