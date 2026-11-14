@@ -332,7 +332,7 @@ def render_contacts_view(selected_sheet_id):
         role_filter = st.selectbox("Фільтр за роллю", options=["Всі ролі"] + ALL_ROLES)
     with f_col3:
         if not st.session_state.show_new_contact_modal and not st.session_state.edit_contact_id:
-            if st.button("➕ Додати новий контакт", type="primary", use_container_width=True):
+            if st.button("➕ Додати новий контакт", type="primary", width="stretch"):
                 st.session_state.show_new_contact_modal = True
                 st.session_state.edit_contact_id = None
                 st.rerun()
@@ -380,7 +380,7 @@ def render_contacts_view(selected_sheet_id):
 
         event = st.dataframe(
             df_display,
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
             on_select="rerun",
             selection_mode="single-row",
