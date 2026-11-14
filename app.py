@@ -1,9 +1,8 @@
-import pandas as pd
 import streamlit as st
 from utils.auth_service import authenticate_user
-from utils.sheets_service import get_orders_data
-from views.new_order import render_new_order_view
 from views.contacts_manager import render_contacts_view
+from views.manager_orders import render_manager_orders_view
+from views.new_order import render_new_order_view
 
 st.set_page_config(
     page_title="Motia Furniture CRM", page_icon="🪑", layout="wide"
@@ -50,7 +49,6 @@ if not db_options:
     )
     st.info("💡 Зверніться до адміністратора для налаштування доступу.")
 else:
-    # Якщо баз кілька — виводимо випадаючий список
     if len(db_options) > 1:
         selected_db_name = st.sidebar.selectbox(
             "📂 Оберіть базу даних:", list(db_options.keys())
@@ -59,7 +57,6 @@ else:
         selected_db_name = list(db_options.keys())[0]
         st.sidebar.info(f"📂 Активна база:\n\n**{selected_db_name}**")
 
-    # Коректно витягуємо ID таблиці та ID папки Диску зі словника
     selected_db_info = db_options[selected_db_name]
     selected_sheet_id = selected_db_info.get("sheet_id", "")
     drive_folder_id = selected_db_info.get("drive_folder_id", "")
