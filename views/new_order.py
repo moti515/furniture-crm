@@ -169,7 +169,7 @@ def render_new_order_view(selected_sheet_id, drive_folder_id):
 
     st.markdown("---")
 
-    if st.button("Зберегти нове замовлення", type="primary", use_container_width=True):
+    if st.button("Зберегти нове замовлення", type="primary", width="stretch"):
         if not order_name or not customer:
             st.error("❌ Будь ласка, заповніть обов'язкові поля: Замовник та Назва замовлення.")
         else:
