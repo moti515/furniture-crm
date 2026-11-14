@@ -73,12 +73,7 @@ else:
 
     # --- МЕНЮ ТА РОУТИНГ ---
     if menu == "📋 Актуальні замовлення":
-        raw_data = get_orders_data(selected_sheet_id, "Orders")
-        if raw_data:
-            df = pd.DataFrame(raw_data)
-            st.dataframe(df, width="stretch")
-        else:
-            st.info("У цій базі замовлення відсутні або аркуш 'Orders' порожній.")
+        render_manager_orders_view(selected_sheet_id, drive_folder_id)
 
     elif menu == "➕ Нове замовлення":
         render_new_order_view(selected_sheet_id, drive_folder_id)
