@@ -9,23 +9,22 @@ from utils.sheets_service import (
 ALL_ROLES = ["Замовник", "Замірник", "Дизайнер", "Конструктор", "Виробник", "Монтажник", "Інше"]
 
 
-def render_contact_picker(label, key_suffix, role_filter="", selected_sheet_id=None, all_contacts_records=None):
-    """Двоколоночний інтерактивний компонент вибору контактів для форми замовлення."""
-    # Замінюємо звичайну зірочку на безпечну або підсвічуємо її червоним
+def render_role_picker(label, key_suffix, default_roles=None):
+    """Двоколоночний компонент вибору ролей / категорій всередині форми контакту."""
     formatted_label = label.replace("*", '<span style="color: red; font-weight: bold;">*</span>')
-    st.markdown(f"**{formatted_label}**", unsafe_allow_html=True)
-    
+    st.markdown(f"**{formatted_label}:**", unsafe_allow_html=True)
+
     state_key = f"picked_roles_{key_suffix}"
     if state_key not in st.session_state:
         if default_roles:
             st.session_state[state_key] = [r.strip() for r in str(default_roles).split(",") if r.strip()]
         else:
             st.session_state[state_key] = []
-            
+
     available_roles = [r for r in ALL_ROLES if r not in st.session_state[state_key]]
-    
+
     col_left, col_right = st.columns([3, 3])
-    
+
     with col_left:
         st.markdown("<small><b>Вибрані ролі:</b></small>", unsafe_allow_html=True)
         if not st.session_state[state_key]:
@@ -39,30 +38,36 @@ def render_contact_picker(label, key_suffix, role_filter="", selected_sheet_id=N
                     if st.button("❌", key=f"del_role_{key_suffix}_{idx}_{role}", help="Видалити"):
                         st.session_state[state_key].remove(role)
                         st.rerun()
-                        
+
     with col_right:
         st.markdown("<small><b>Додати роль:</b></small>", unsafe_allow_html=True)
         options = ["-- Оберіть роль --"] + available_roles
-        chosen = st.selectbox("Обрати роль", options=options, key=f"sel_box_role_{key_suffix}", label_visibility="collapsed")
+        chosen = st.selectbox(
+            "Обрати роль",
+            options=options,
+            key=f"sel_box_role_{key_suffix}",
+            label_visibility="collapsed",
+        )
         if chosen and chosen != "-- Оберіть роль --":
             if chosen not in st.session_state[state_key]:
                 st.session_state[state_key].append(chosen)
                 st.rerun()
-                
+
     st.caption("💡 Для додавання нових категорій/ролей — зверніться до адміністратора.")
     return st.session_state[state_key]
 
 
 def render_contact_picker(label, key_suffix, role_filter="", selected_sheet_id=None, all_contacts_records=None):
     """Двоколоночний інтерактивний компонент вибору контактів для форми замовлення."""
-    st.markdown(f"**{label}**")
-    
+    formatted_label = label.replace("*", '<span style="color: red; font-weight: bold;">*</span>')
+    st.markdown(f"**{formatted_label}**", unsafe_allow_html=True)
+
     state_key = f"picked_contacts_{key_suffix}"
     if state_key not in st.session_state:
         st.session_state[state_key] = []
-        
+
     all_contacts = []
-    for row in all_contacts_records:
+    for row in all_contacts_records or []:
         contact_id = str(row.get("ID Контакту", "")).strip()
         name = str(row.get("ПІБ / Назва", "")).strip()
         roles_str = str(row.get("Роль / Категорія", "")).strip()
@@ -76,11 +81,11 @@ def render_contact_picker(label, key_suffix, role_filter="", selected_sheet_id=N
             else:
                 all_contacts.append(display_label)
     all_contacts = sorted(list(set(all_contacts)))
-    
+
     available_contacts = [c for c in all_contacts if c not in st.session_state[state_key]]
-    
+
     col_left, col_right, col_btn = st.columns([3, 3, 1])
-    
+
     with col_left:
         st.markdown("<small><b>Вибрані:</b></small>", unsafe_allow_html=True)
         if not st.session_state[state_key]:
@@ -94,40 +99,50 @@ def render_contact_picker(label, key_suffix, role_filter="", selected_sheet_id=N
                     if st.button("❌", key=f"del_{key_suffix}_{idx}_{item}", help="Видалити"):
                         st.session_state[state_key].remove(item)
                         st.rerun()
-                        
+
     with col_right:
         st.markdown("<small><b>Додати з бази:</b></small>", unsafe_allow_html=True)
         options = ["-- Оберіть контакт --"] + available_contacts
-        chosen = st.selectbox("Додати", options=options, key=f"sel_box_{key_suffix}", label_visibility="collapsed")
+        chosen = st.selectbox(
+            "Додати",
+            options=options,
+            key=f"sel_box_{key_suffix}",
+            label_visibility="collapsed",
+        )
         if chosen and chosen != "-- Оберіть контакт --":
             if chosen not in st.session_state[state_key]:
                 st.session_state[state_key].append(chosen)
                 st.rerun()
-                
+
     with col_btn:
         st.markdown("<small>&nbsp;</small>", unsafe_allow_html=True)
         if st.button("➕ Новий", key=f"btn_add_{key_suffix}"):
             st.session_state[f"show_add_{key_suffix}"] = True
             st.rerun()
-            
+
     if st.session_state.get(f"show_add_{key_suffix}", False):
         def close_form():
             st.session_state[f"show_add_{key_suffix}"] = False
             st.rerun()
+
         render_contact_form(
             selected_sheet_id=selected_sheet_id,
             default_role=role_filter,
             key_suffix=f"inline_{key_suffix}",
-            on_success=close_form
+            on_success=close_form,
         )
-        
+
     return ", ".join(st.session_state[state_key])
 
 
 def render_contact_form(selected_sheet_id, default_role="", contact_data_to_edit=None, key_suffix="new_contact", on_success=None):
     """Оптимізована форма додавання або редагування контакту з розширеними полями."""
     is_edit = contact_data_to_edit is not None
-    title = f"📝 Редагування контакту: {contact_data_to_edit.get('ПІБ / Назва', '')}" if is_edit else "📝 Форма нового контакту"
+    title = (
+        f"📝 Редагування контакту: {contact_data_to_edit.get('ПІБ / Назва', '')}"
+        if is_edit
+        else "📝 Форма нового контакту"
+    )
     btn_label = "🔄 Оновити контакт" if is_edit else "💾 Зберегти нові дані"
 
     st.info(title)
@@ -140,40 +155,49 @@ def render_contact_form(selected_sheet_id, default_role="", contact_data_to_edit
 
         col1, col2 = st.columns(2)
         with col1:
-            name = st.text_input("ПІБ / Назва *", value=contact_data_to_edit.get("ПІБ / Назва", "") if is_edit else "", key=f"name_{sfx}")
+            name = st.text_input(
+                "ПІБ / Назва *",
+                value=contact_data_to_edit.get("ПІБ / Назва", "") if is_edit else "",
+                key=f"name_{sfx}",
+            )
         with col2:
-            company = st.text_input("Компанія", value=contact_data_to_edit.get("Компанія", "") if is_edit else "", key=f"company_{sfx}", placeholder="Напр., ТОВ «Меблі-Світ»")
+            company = st.text_input(
+                "Компанія",
+                value=contact_data_to_edit.get("Компанія", "") if is_edit else "",
+                key=f"company_{sfx}",
+                placeholder="Напр., ТОВ «Меблі-Світ»",
+            )
 
         existing_roles_str = contact_data_to_edit.get("Роль / Категорія", default_role) if is_edit else default_role
-        selected_roles = render_role_picker("Роль / Категорія", key_suffix=sfx, default_roles=existing_roles_str)
+        selected_roles = render_role_picker("Роль / Категорія *", key_suffix=sfx, default_roles=existing_roles_str)
 
         st.markdown("---")
 
         col3, col4 = st.columns(2)
         with col3:
             phone = st.text_input(
-                "Телефон(и)", 
-                value=contact_data_to_edit.get("Телефон(и)", "") if is_edit else "", 
+                "Телефон(и)",
+                value=contact_data_to_edit.get("Телефон(и)", "") if is_edit else "",
                 key=f"phone_{sfx}",
-                placeholder="+4915123456789, +380501112233"
+                placeholder="+4915123456789, +380501112233",
             )
             st.caption("💡 У міжнародній формі, через кому")
         with col4:
             email = st.text_input(
-                "Email(и)", 
-                value=contact_data_to_edit.get("Email(и)", "") if is_edit else "", 
+                "Email(и)",
+                value=contact_data_to_edit.get("Email(и)", "") if is_edit else "",
                 key=f"email_{sfx}",
-                placeholder="example1@gmail.com, example2@ukr.net"
+                placeholder="example1@gmail.com, example2@ukr.net",
             )
             st.caption("💡 Декілька адрес — через кому")
 
         col5, col6 = st.columns(2)
         with col5:
             telegram = st.text_input(
-                "Нік Telegram", 
-                value=contact_data_to_edit.get("Нік Telegram", "") if is_edit else "", 
+                "Нік Telegram",
+                value=contact_data_to_edit.get("Нік Telegram", "") if is_edit else "",
                 key=f"telegram_{sfx}",
-                placeholder="@username1, @username2"
+                placeholder="@username1, @username2",
             )
             st.caption("💡 З собачки (@), через кому")
         with col6:
@@ -182,20 +206,30 @@ def render_contact_form(selected_sheet_id, default_role="", contact_data_to_edit
             type_idx = client_types.index(curr_type) if curr_type in client_types else 0
             client_type = st.selectbox("Тип (Фіз./Юр.)", options=client_types, index=type_idx, key=f"client_type_{sfx}")
 
-        address = st.text_input("Адреса / Місто", value=contact_data_to_edit.get("Адреса / Місто", "") if is_edit else "", key=f"address_{sfx}", placeholder="м. Штутгарт, вул. Штрассе, 12")
-        comment = st.text_area("Коментар", value=contact_data_to_edit.get("Коментар", "") if is_edit else "", key=f"comment_{sfx}", placeholder="Будь-які додаткові нотатки...")
+        address = st.text_input(
+            "Адреса / Місто",
+            value=contact_data_to_edit.get("Адреса / Місто", "") if is_edit else "",
+            key=f"address_{sfx}",
+            placeholder="м. Штутгарт, вул. Штрассе, 12",
+        )
+        comment = st.text_area(
+            "Коментар",
+            value=contact_data_to_edit.get("Коментар", "") if is_edit else "",
+            key=f"comment_{sfx}",
+            placeholder="Будь-які додаткові нотатки...",
+        )
 
         if is_edit:
             st.markdown("#### 🔗 Зв'язані проєкти")
             orders_data = get_orders_data(selected_sheet_id, "Orders")
             contact_name = contact_data_to_edit.get("ПІБ / Назва", "").strip()
-            
+
             linked_orders = []
             for ord_row in orders_data:
                 row_str = " ".join([str(val) for val in ord_row.values()])
                 if contact_name and contact_name.lower() in row_str.lower():
                     linked_orders.append(ord_row.get("ID Замовлення", "Н/Д") + " - " + ord_row.get("Назва замовлення", ""))
-            
+
             if linked_orders:
                 for proj in linked_orders:
                     st.markdown(f"- 📂 {proj}")
@@ -223,41 +257,49 @@ def render_contact_form(selected_sheet_id, default_role="", contact_data_to_edit
                         "Адреса / Місто": address,
                         "Коментар": comment,
                     }
-                    
+
                     if is_edit:
                         contact_payload["ID Контакту"] = contact_id
-                        
+
                     success = save_new_contact(selected_sheet_id, contact_payload)
-                        
+
                     if success:
                         st.success(f"✅ Контакт '{name}' успішно збережено!")
-                        
-                        # Закриваємо модальні вікна/інлайн форми створення
                         st.session_state.edit_contact_id = None
                         st.session_state.show_new_contact_modal = False
-                        
-                        # Шукаємо та вимикаємо інлайн-форми створення контакту для пікерів у замовленнях
+
                         for k in list(st.session_state.keys()):
                             if k.startswith("show_add_"):
                                 st.session_state[k] = False
-                                
+
                         st.session_state.table_form_nonce = st.session_state.get("table_form_nonce", 0) + 1
                         if f"picked_roles_{sfx}" in st.session_state:
                             del st.session_state[f"picked_roles_{sfx}"]
-                        st.rerun()
+
+                        if callable(on_success):
+                            on_success()
+                        else:
+                            st.rerun()
                     else:
                         st.error("❌ Помилка збереження контакту.")
         with col_s2:
             if st.button("Скасувати", key=f"btn_cancel_{sfx}"):
                 st.session_state.edit_contact_id = None
                 st.session_state.show_new_contact_modal = False
+
                 for k in list(st.session_state.keys()):
                     if k.startswith("show_add_"):
                         st.session_state[k] = False
+
                 st.session_state.table_form_nonce = st.session_state.get("table_form_nonce", 0) + 1
                 if f"picked_roles_{sfx}" in st.session_state:
                     del st.session_state[f"picked_roles_{sfx}"]
-                st.rerun()
+
+                if callable(on_success):
+                    on_success()
+                else:
+                    st.rerun()
+
 
 def render_contacts_view(selected_sheet_id):
     """Розділ контактів у форматі інтерактивної таблиці."""
@@ -290,7 +332,7 @@ def render_contacts_view(selected_sheet_id):
         role_filter = st.selectbox("Фільтр за роллю", options=["Всі ролі"] + ALL_ROLES)
     with f_col3:
         if not st.session_state.show_new_contact_modal and not st.session_state.edit_contact_id:
-            if st.button("➕ Додати новий контакт", type="primary", width="stretch"):
+            if st.button("➕ Додати новий контакт", type="primary", use_container_width=True):
                 st.session_state.show_new_contact_modal = True
                 st.session_state.edit_contact_id = None
                 st.rerun()
@@ -299,8 +341,8 @@ def render_contacts_view(selected_sheet_id):
 
     if st.session_state.show_new_contact_modal:
         render_contact_form(
-            selected_sheet_id, 
-            key_suffix="new_modal"
+            selected_sheet_id,
+            key_suffix="new_modal",
         )
         st.markdown("---")
 
@@ -314,10 +356,10 @@ def render_contacts_view(selected_sheet_id):
 
         q = search_query.lower()
         match_search = not search_query or (
-            q in name.lower() or 
-            q in comp.lower() or 
-            q in addr.lower() or 
-            q in comm.lower()
+            q in name.lower()
+            or q in comp.lower()
+            or q in addr.lower()
+            or q in comm.lower()
         )
         match_role = role_filter == "Всі ролі" or role_filter.lower() in roles.lower()
 
@@ -327,23 +369,22 @@ def render_contacts_view(selected_sheet_id):
     if filtered_records:
         df = pd.DataFrame(filtered_records)
         df = df.astype(str)
-        
+
         hidden_columns = ["ID Контакту", "Email(и)", "Нік Telegram", "Коментар"]
         display_columns = [col for col in df.columns if col not in hidden_columns]
         df_display = df[display_columns]
 
         st.caption("💡 **Порада:** Відмітьте галочкою будь-який рядок у таблиці нижче, щоб відкрити повну інформацію а також для редагування.")
-        
-        # Динамічний ключ key генерує абсолютно новий екземпляр таблиці при закритті форми, що гарантовано скидає галочки виділення
+
         table_key = f"contacts_table_{st.session_state.table_form_nonce}"
-        
+
         event = st.dataframe(
             df_display,
-            width="stretch",
+            use_container_width=True,
             hide_index=True,
             on_select="rerun",
             selection_mode="single-row",
-            key=table_key
+            key=table_key,
         )
 
         selected_rows = event.selection.get("rows", [])
@@ -362,12 +403,12 @@ def render_contacts_view(selected_sheet_id):
 
     if st.session_state.edit_contact_id:
         target_contact = next(
-            (c for c in contacts_records if str(c.get("ID Контакту")) == str(st.session_state.edit_contact_id)), 
-            None
+            (c for c in contacts_records if str(c.get("ID Контакту")) == str(st.session_state.edit_contact_id)),
+            None,
         )
         if target_contact:
             st.markdown("---")
             render_contact_form(
-                selected_sheet_id, 
-                contact_data_to_edit=target_contact
+                selected_sheet_id,
+                contact_data_to_edit=target_contact,
             )
