@@ -64,32 +64,72 @@ def generate_next_order_id(spreadsheet_id: str) -> str:
 
 
 def save_new_order(spreadsheet_id: str, order_data: dict) -> str:
-    """Генерує ID, заповнює службові поля та додає новий рядок у Orders."""
+    """Створює нове замовлення або оновлює існуючий рядок за ID Замовлення."""
     client = get_gspread_client()
     try:
         sh = client.open_by_key(spreadsheet_id)
         worksheet = sh.worksheet("Orders")
 
-        order_id = generate_next_order_id(spreadsheet_id)
-        created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
         raw_headers = worksheet.row_values(1)
         headers = [str(h).strip() for h in raw_headers]
+
+        existing_id = str(order_data.get("ID Замовлення", "")).strip()
+        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        if existing_id:
+            # Режим редагування: шукаємо рядок за ID Замовлення у 1-й колонці
+            col_vals = worksheet.col_values(1)
+            row_idx = None
+            for idx, val in enumerate(col_vals[1:], start=2):
+                if str(val).strip() == existing_id:
+                    row_idx = idx
+                    break
+
+            if not row_idx:
+                st.error(f"❌ Замовлення з ID '{existing_id}' не знайдено для оновлення.")
+                return ""
+
+            # Зчитуємо поточні значення рядка, щоб зберегти колонки, які не редагувалися
+            current_row_vals = worksheet.row_values(row_idx)
+            merged_data = {
+                headers[i]: (current_row_vals[i] if i < len(current_row_vals) else "")
+                for i in range(len(headers))
+            }
+
+            merged_data.update(order_data)
+            merged_data["ID Замовлення"] = existing_id
+            merged_data["Час останнього редагування"] = order_data.get(
+                "Час останнього редагування", now_str
+            )
+
+            # Не перезаписуємо Час створення, якщо воно вже є в таблиці
+            if not str(merged_data.get("Час створення", "")).strip():
+                merged_data["Час створення"] = now_str
+
+            final_row = [str(merged_data.get(h, "")) for h in headers]
+            cell_range = f"A{row_idx}:{gspread.utils.rowcol_to_a1(row_idx, len(headers))}"
+            worksheet.update(cell_range, [final_row])
+
+            get_orders_data.clear()
+            return existing_id
+
+        # Режим створення нового замовлення
+        order_id = generate_next_order_id(spreadsheet_id)
+        created_at = order_data.get("Час створення", now_str)
 
         full_data = {
             "ID Замовлення": order_id,
             "Поточний статус": "Нове замовлення",
-            "Архів": False,
+            "Архів": "",
             "Час створення": created_at,
             "Час останнього редагування": created_at,
         }
         full_data.update(order_data)
+        full_data["ID Замовлення"] = order_id
 
         final_row = [str(full_data.get(h, "")) for h in headers]
-
         worksheet.append_row(final_row)
-        
-        # Скидаємо кеш лише для замовлень
+
         get_orders_data.clear()
         return order_id
 
@@ -110,7 +150,6 @@ def save_new_contact(spreadsheet_id: str, contact_data: dict) -> bool:
         existing_id = contact_data.get("ID Контакту")
 
         if existing_id:
-            # Режим редагування: шукаємо потрібний рядок за ID у 1-й колонці
             col_vals = worksheet.col_values(1)
             row_idx = None
             for idx, val in enumerate(col_vals[1:], start=2):
@@ -126,7 +165,6 @@ def save_new_contact(spreadsheet_id: str, contact_data: dict) -> bool:
                 st.error(f"❌ Контакт з ID '{existing_id}' не знайдено для оновлення.")
                 return False
         else:
-            # Режим створення нового контакту
             col_vals = worksheet.col_values(1)
             existing_numbers = []
             for val in col_vals[1:]:
@@ -145,7 +183,6 @@ def save_new_contact(spreadsheet_id: str, contact_data: dict) -> bool:
             final_row = [str(full_data.get(h, "")) for h in headers]
             worksheet.append_row(final_row)
 
-        # Скидаємо кеш ТОЧКОВО лише для контактів
         get_all_contacts_records.clear()
         return True
 
