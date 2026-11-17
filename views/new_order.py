@@ -1,7 +1,9 @@
+from datetime import datetime
 import streamlit as st
 from utils.drive_service import (
     create_order_folder_structure,
     get_drive_hierarchy,
+    sync_order_drive_folder,
 )
 from utils.sheets_service import (
     get_all_contacts_records,
@@ -14,11 +16,14 @@ from views.contacts_manager import (
 
 STANDARD_FORM_FIELDS = {
     "ID Замовлення",
+    "Архів",
+    "Час створення",
+    "Час останнього редагування",
     "Замовник / Представник",
     "Країна",
     "Місто / Ort",
-    "Назва об'єкта",
     "Адреса",
+    "Назва об'єкта",
     "Назва замовлення",
     "Суть/Зміст замовлення",
     "Тип замовлення",
@@ -58,6 +63,13 @@ def _parse_list(value: str) -> list[str]:
     if not value:
         return []
     return [item.strip() for item in str(value).split(",") if item.strip()]
+
+
+def _is_archived_value(val) -> bool:
+    if isinstance(val, bool):
+        return val
+    s = str(val or "").strip().lower()
+    return s in ("так", "true", "1", "yes", "архів", "в архіві")
 
 
 def _extract_contact_name_and_id(contact_label: str) -> tuple[str, str]:
@@ -205,8 +217,39 @@ def render_order_form(
     st.markdown("### 📌 Основна інформація")
     label_style = "font-size: 1.05rem; font-weight: 700; margin-bottom: 0.3rem; display: block;"
 
-    if is_edit and order_id:
-        st.text_input("ID Замовлення", value=order_id, disabled=True, key=f"oid_{sfx}")
+    # Поля ID Замовлення, Час створення, Час останнього редагування — лише в режимі редагування (недоступні)
+    if is_edit:
+        meta_c1, meta_c2, meta_c3 = st.columns(3)
+        with meta_c1:
+            st.text_input(
+                "ID Замовлення",
+                value=order_id,
+                disabled=True,
+                key=f"oid_{sfx}",
+            )
+        with meta_c2:
+            st.text_input(
+                "Час створення",
+                value=str(order_row.get("Час створення", "")),
+                disabled=True,
+                key=f"created_at_{sfx}",
+            )
+        with meta_c3:
+            st.text_input(
+                "Час останнього редагування",
+                value=str(order_row.get("Час останнього редагування", "")),
+                disabled=True,
+                key=f"updated_at_{sfx}",
+            )
+
+    # Поле Архів — відображається в обох режимах
+    is_archived_default = _is_archived_value(order_row.get("Архів", False)) if is_edit else False
+    chk_archive = st.checkbox(
+        "Архів",
+        value=is_archived_default,
+        key=f"chk_archive_{sfx}",
+        help="Позначає замовлення як архівне для фільтрації у менеджері замовлень та звітності.",
+    )
 
     with st.container(border=True):
         customer = render_contact_picker(
@@ -257,8 +300,11 @@ def render_order_form(
             if selected_country != "Інше"
             else ["Інше"]
         )
-        if curr_city and curr_city not in cities:
+        if is_edit and curr_city and curr_city not in cities and selected_country == curr_country:
             cities = [curr_city] + cities
+        prev_city = st.session_state.get(f"sel_city_{sfx}")
+        if prev_city and prev_city not in cities:
+            st.session_state[f"sel_city_{sfx}"] = cities[0]
         city_idx = cities.index(curr_city) if curr_city in cities else 0
         selected_city = st.selectbox("Місто / Ort", options=cities, index=city_idx, key=f"sel_city_{sfx}")
 
@@ -268,8 +314,11 @@ def render_order_form(
             if selected_country != "Інше" and selected_city != "Інше"
             else ["Інше"]
         )
-        if curr_object and curr_object not in objects:
+        if is_edit and curr_object and curr_object not in objects and (selected_country, selected_city) == (curr_country, curr_city):
             objects = [curr_object] + objects
+        prev_obj = st.session_state.get(f"sel_object_{sfx}")
+        if prev_obj and prev_obj not in objects:
+            st.session_state[f"sel_object_{sfx}"] = objects[0]
         obj_idx = objects.index(curr_object) if curr_object in objects else 0
         selected_object = st.selectbox("Назва об'єкта", options=objects, index=obj_idx, key=f"sel_object_{sfx}")
 
@@ -468,18 +517,35 @@ def render_order_form(
             spinner_text = "Оновлення даних замовлення..." if is_edit else "Створення папок на Google Диску та збереження даних..."
             with st.spinner(spinner_text):
                 try:
+                    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    archive_val = "Так" if chk_archive else ""
+
                     if is_edit:
-                        folder_link = str(order_row.get("Папка на Диску", "")).strip()
-                        if not folder_link and drive_folder_id:
-                            folder_link = create_order_folder_structure(
-                                drive_folder_id, selected_country, selected_city, selected_object, order_name
-                            )
+                        created_at_val = str(order_row.get("Час створення", "")).strip() or now_str
+                        updated_at_val = now_str
+                        folder_link = sync_order_drive_folder(
+                            root_folder_id=drive_folder_id,
+                            existing_folder_url=str(order_row.get("Папка на Диску", "")).strip(),
+                            old_country=curr_country,
+                            old_city=curr_city,
+                            old_object=curr_object,
+                            old_order_name=str(order_row.get("Назва замовлення", "")).strip(),
+                            new_country=selected_country,
+                            new_city=selected_city,
+                            new_object=selected_object,
+                            new_order_name=order_name,
+                        )
                     else:
+                        created_at_val = now_str
+                        updated_at_val = now_str
                         folder_link = create_order_folder_structure(
                             drive_folder_id, selected_country, selected_city, selected_object, order_name
                         )
 
                     order_payload = {
+                        "Архів": archive_val,
+                        "Час створення": created_at_val,
+                        "Час останнього редагування": updated_at_val,
                         "Замовник / Представник": customer,
                         "Країна": selected_country,
                         "Місто / Ort": selected_city,
@@ -511,6 +577,7 @@ def render_order_form(
                             )
 
                         keys_to_clear = [
+                            f"chk_archive_{sfx}",
                             f"order_name_{sfx}", f"order_content_{sfx}", f"address_{sfx}",
                             f"sel_country_{sfx}", f"sel_city_{sfx}", f"sel_object_{sfx}",
                             f"chk_m_{sfx}", f"chk_d_{sfx}", f"chk_c_{sfx}", f"chk_p_{sfx}",
