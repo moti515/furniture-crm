@@ -1,5 +1,6 @@
-from googleapiclient.discovery import build
+import re
 from google.oauth2 import service_account
+from googleapiclient.discovery import build
 import streamlit as st
 
 
@@ -46,7 +47,7 @@ def get_drive_hierarchy(root_folder_id: str):
         for country in countries:
             c_name = country["name"]
             if c_name.strip().lower() == "інше":
-                continue  # Ігноруємо папку "Інше" при зчитуванні структури
+                continue
 
             c_id = country["id"]
             folder_ids[c_name] = c_id
@@ -79,8 +80,9 @@ def get_drive_hierarchy(root_folder_id: str):
 
 def ensure_folder(service, parent_id: str, folder_name: str) -> str:
     """Шукає папку за ім'ям усередині parent_id, якщо немає — створює."""
+    safe_name = folder_name.replace("'", "\\'")
     query = (
-        f"'{parent_id}' in parents and name='{folder_name}' and"
+        f"'{parent_id}' in parents and name='{safe_name}' and"
         " mimeType='application/vnd.google-apps.folder' and trashed=false"
     )
     results = service.files().list(q=query, fields="files(id, name)").execute()
@@ -96,6 +98,56 @@ def ensure_folder(service, parent_id: str, folder_name: str) -> str:
     }
     folder = service.files().create(body=file_metadata, fields="id").execute()
     return folder.get("id")
+
+
+def extract_folder_id_from_url(folder_url: str) -> str:
+    """Витягує ID папки Google Drive з webViewLink або URL."""
+    if not folder_url:
+        return ""
+    match = re.search(r"/folders/([a-zA-Z0-9_-]+)", folder_url)
+    if match:
+        return match.group(1)
+    match_id = re.search(r"[?&]id=([a-zA-Z0-9_-]+)", folder_url)
+    if match_id:
+        return match_id.group(1)
+    return ""
+
+
+def rename_drive_folder(folder_id: str, new_name: str) -> str:
+    """Перейменовує папку на Google Диску та повертає актуальний webViewLink."""
+    service = get_drive_service()
+    updated = (
+        service.files()
+        .update(
+            fileId=folder_id,
+            body={"name": new_name},
+            fields="id, name, webViewLink",
+        )
+        .execute()
+    )
+    return updated.get("webViewLink", "")
+
+
+def move_drive_folder(folder_id: str, new_parent_id: str) -> str:
+    """Переміщує папку на Google Диску до нового батьківського каталогу."""
+    service = get_drive_service()
+    meta = (
+        service.files()
+        .get(fileId=folder_id, fields="parents, webViewLink")
+        .execute()
+    )
+    previous_parents = ",".join(meta.get("parents", []))
+    updated = (
+        service.files()
+        .update(
+            fileId=folder_id,
+            addParents=new_parent_id,
+            removeParents=previous_parents,
+            fields="id, parents, webViewLink",
+        )
+        .execute()
+    )
+    return updated.get("webViewLink", "")
 
 
 def create_order_folder_structure(
@@ -134,3 +186,50 @@ def create_order_folder_structure(
     except Exception as e:
         st.error(f"Помилка створення папок на Google Диску: {e}")
         return ""
+
+
+def sync_order_drive_folder(
+    root_folder_id: str,
+    existing_folder_url: str,
+    old_country: str,
+    old_city: str,
+    old_object: str,
+    old_order_name: str,
+    new_country: str,
+    new_city: str,
+    new_object: str,
+    new_order_name: str,
+) -> str:
+    """Синхронізує папку замовлення на Диску при редагуванні (переміщення / перейменування)."""
+    folder_id = extract_folder_id_from_url(existing_folder_url)
+    if not folder_id or not root_folder_id:
+        return create_order_folder_structure(
+            root_folder_id, new_country, new_city, new_object, new_order_name
+        )
+
+    try:
+        service = get_drive_service()
+        current_link = existing_folder_url
+
+        location_changed = (
+            (new_country or "").strip() != (old_country or "").strip()
+            or (new_city or "").strip() != (old_city or "").strip()
+            or (new_object or "").strip() != (old_object or "").strip()
+        )
+        if location_changed:
+            country_id = ensure_folder(service, root_folder_id, new_country)
+            city_id = ensure_folder(service, country_id, new_city)
+            object_id = ensure_folder(service, city_id, new_object)
+            moved_link = move_drive_folder(folder_id, object_id)
+            if moved_link:
+                current_link = moved_link
+
+        if (new_order_name or "").strip() != (old_order_name or "").strip():
+            renamed_link = rename_drive_folder(folder_id, new_order_name)
+            if renamed_link:
+                current_link = renamed_link
+
+        return current_link
+    except Exception as e:
+        st.error(f"Помилка оновлення папки на Google Диску: {e}")
+        return existing_folder_url
