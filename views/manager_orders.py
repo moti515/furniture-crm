@@ -30,14 +30,15 @@ SEARCH_FIELDS = [
 
 
 def _is_archived_order(row: dict) -> bool:
-    for col_name in ("Архів", "В архіві", "Архівне", "Статус", "Стан"):
-        val = str(row.get(col_name, "")).strip().lower()
-        if not val:
-            continue
-        if col_name in ("Архів", "В архіві", "Архівне"):
-            if val in ("так", "true", "1", "yes", "архів", "в архіві"):
-                return True
-        elif "архів" in val or "archive" in val:
+    val = row.get("Архів", "")
+    if isinstance(val, bool):
+        return val
+    s = str(val or "").strip().lower()
+    if s in ("так", "true", "1", "yes", "архів", "в архіві"):
+        return True
+    for col_name in ("В архіві", "Архівне", "Статус", "Стан"):
+        c_val = str(row.get(col_name, "")).strip().lower()
+        if c_val in ("так", "true", "1", "yes", "архів", "в архіві") or "архів" in c_val or "archive" in c_val:
             return True
     return False
 
