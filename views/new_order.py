@@ -668,4 +668,128 @@ def render_order_form(
 
     if is_edit:
         extra_table_fields = [k for k in order_row.keys() if k not in STANDARD_FORM_FIELDS]
-        if extra_
+        if extra_table_fields:
+            st.markdown("---")
+            st.markdown("### 📋 Додаткові поля таблиці")
+            extra_cols = st.columns(2)
+            for idx, field_name in enumerate(extra_table_fields):
+                with extra_cols[idx % 2]:
+                    order_payload_extras[field_name] = st.text_input(
+                        field_name, value=str(order_row.get(field_name, "")), key=f"extra_{sfx}_{field_name}"
+                    )
+
+    st.markdown("---")
+
+    submit_label = "💾 Зберегти зміни замовлення" if is_edit else "Зберегти нове замовлення"
+    if st.button(submit_label, type="primary", key=f"btn_submit_order_{sfx}", width="stretch"):
+        if not order_name or not customer:
+            st.error("❌ Будь ласка, заповніть обов'язкові поля: Замовник та Назва замовлення.")
+        else:
+            spinner_text = "Оновлення даних замовлення..." if is_edit else "Створення папок на Google Диску та збереження даних..."
+            with st.spinner(spinner_text):
+                try:
+                    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    archive_val = "Так" if chk_archive else ""
+
+                    if is_edit:
+                        created_at_val = str(order_row.get("Час створення", "")).strip() or now_str
+                        updated_at_val = now_str
+                        folder_link = sync_order_drive_folder(
+                            root_folder_id=drive_folder_id,
+                            existing_folder_url=str(order_row.get("Папка на Диску", "")).strip(),
+                            old_country=curr_country,
+                            old_city=curr_city,
+                            old_object=curr_object,
+                            old_order_name=str(order_row.get("Назва замовлення", "")).strip(),
+                            new_country=selected_country,
+                            new_city=selected_city,
+                            new_object=selected_object,
+                            new_order_name=order_name,
+                        )
+                    else:
+                        created_at_val = now_str
+                        updated_at_val = now_str
+                        folder_link = create_order_folder_structure(
+                            drive_folder_id, selected_country, selected_city, selected_object, order_name
+                        )
+
+                    order_payload = {
+                        "Архів": archive_val,
+                        "Час створення": created_at_val,
+                        "Час останнього редагування": updated_at_val,
+                        "Замовник / Представник": customer,
+                        "Країна": selected_country,
+                        "Місто / Ort": selected_city,
+                        "Назва об'єкта": selected_object,
+                        "Адреса": address,
+                        "Назва замовлення": order_name,
+                        "Суть/Зміст замовлення": order_content,
+                        "Пов'язані замовлення": ", ".join(related_orders_list),
+                        "Поточний статус": "",  # Розраховується формулою масиву в таблиці
+                        "Тип замовлення": ", ".join(active_types),
+                        "Замірник": measurer,
+                        "Дизайнер": designer,
+                        "Конструктор": constructor,
+                        "Виробник": producer,
+                        "Монтажник": installer,
+                        "Інші пов'язані особи": other_persons,
+                        "Папка на Диску": folder_link,
+                    }
+                    if is_edit and order_id:
+                        order_payload["ID Замовлення"] = order_id
+                    order_payload.update(order_payload_extras)
+                    order_payload["Поточний статус"] = ""
+
+                    saved_id = save_new_order(selected_sheet_id, order_payload)
+
+                    if saved_id:
+                        if is_edit:
+                            st.success(f"✅ Замовлення **{saved_id}** успішно оновлено!")
+                        else:
+                            st.session_state.order_success_msg = (
+                                f"✅ Замовлення **{saved_id}** успішно створено! [Відкрити папку на Диску]({folder_link})"
+                            )
+
+                        keys_to_clear = [
+                            f"chk_archive_{sfx}", f"chk_add_related_orders_{sfx}",
+                            f"related_orders_{sfx}",
+                            f"order_name_{sfx}", f"order_content_{sfx}", f"address_{sfx}",
+                            f"sel_country_{sfx}", f"sel_city_{sfx}", f"sel_object_{sfx}",
+                            f"chk_m_{sfx}", f"chk_d_{sfx}", f"chk_c_{sfx}", f"chk_p_{sfx}",
+                            f"chk_i_{sfx}", f"chk_dg_{sfx}", f"chk_s_{sfx}",
+                            f"s_meas_{sfx}", f"c_meas_{sfx}", f"s_des_{sfx}", f"c_des_{sfx}",
+                            f"s_con_{sfx}", f"c_con_{sfx}", f"s_prod_{sfx}", f"c_prod_{sfx}",
+                            f"s_inst_{sfx}", f"c_inst_{sfx}", f"s_del_{sfx}", f"c_del_{sfx}",
+                        ]
+                        for k in keys_to_clear:
+                            st.session_state.pop(k, None)
+
+                        for suffix in PICKER_MAPPING:
+                            st.session_state.pop(f"picked_contacts_{sfx}_{suffix}", None)
+
+                        if callable(on_success):
+                            on_success()
+                        else:
+                            st.rerun()
+
+                except Exception as e:
+                    st.error(f"❌ Помилка при збереженні замовлення: {e}")
+
+
+def render_new_order_view(selected_sheet_id, drive_folder_id):
+    st.subheader("➕ Створення нового замовлення")
+
+    if st.session_state.get("order_success_msg"):
+        st.success(st.session_state.order_success_msg)
+        st.balloons()
+        st.session_state.order_success_msg = ""
+
+    all_orders_records = get_orders_data(selected_sheet_id, "Orders") or []
+    sync_order_pickers_state(None, key_suffix="new", force=False)
+    render_order_form(
+        selected_sheet_id=selected_sheet_id,
+        drive_folder_id=drive_folder_id,
+        order_data_to_edit=None,
+        key_suffix="new",
+        all_orders_records=all_orders_records,
+    )
