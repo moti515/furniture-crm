@@ -7,6 +7,7 @@ from utils.drive_service import (
 )
 from utils.sheets_service import (
     get_all_contacts_records,
+    get_orders_data,
     save_new_order,
 )
 from views.contacts_manager import (
@@ -26,6 +27,8 @@ STANDARD_FORM_FIELDS = {
     "Назва об'єкта",
     "Назва замовлення",
     "Суть/Зміст замовлення",
+    "Пов'язані замовлення",
+    "Поточний статус",
     "Тип замовлення",
     "Замірник",
     "Дизайнер",
@@ -40,12 +43,16 @@ STANDARD_FORM_FIELDS = {
     "Дизайн коментар",
     "Конструктив статус",
     "Конструктив коментар",
+    "КП / специфікація статус",
+    "КП коментар",
     "Виробництво статус",
     "Виробництво коментар",
-    "Монтаж статус",
-    "Монтаж коментар",
     "Доставка статус",
     "Доставка коментар",
+    "Монтаж статус",
+    "Монтаж коментар",
+    "Звіт / відгук статус",
+    "Звіт / відгук коментар",
 }
 
 PICKER_MAPPING = {
@@ -93,7 +100,7 @@ def _find_contact_record(contact_label: str, all_contacts_records: list[dict]) -
 
 
 def sync_order_pickers_state(order_row: dict | None, key_suffix: str, force: bool = False):
-    """Синхронізує picked_contacts_* у session_state для переданого режиму форми."""
+    """Синхронізує picked_contacts_* та пов'язані замовлення у session_state."""
     for suffix, col_name in PICKER_MAPPING.items():
         st_key = f"picked_contacts_{key_suffix}_{suffix}"
         if order_row is None:
@@ -103,10 +110,162 @@ def sync_order_pickers_state(order_row: dict | None, key_suffix: str, force: boo
             if force or st_key not in st.session_state:
                 st.session_state[st_key] = _parse_list(order_row.get(col_name, ""))
 
+    rel_key = f"related_orders_{key_suffix}"
+    if order_row is None:
+        if force or rel_key not in st.session_state:
+            st.session_state[rel_key] = []
+    else:
+        if force or rel_key not in st.session_state:
+            st.session_state[rel_key] = _parse_list(order_row.get("Пов'язані замовлення", ""))
+
+
+def _open_related_order_in_edit(target_oid: str):
+    st.session_state.edit_order_id = target_oid
+    st.session_state.nav_menu = "📋 Актуальні замовлення"
+    st.query_params["edit_order"] = target_oid
+    st.rerun()
+
+
+def _render_related_orders_section(
+    selected_sheet_id: str,
+    sfx: str,
+    current_order_id: str = "",
+    all_orders_records: list[dict] | None = None,
+) -> list[str]:
+    """Блок відображення та вибору пов'язаних замовлень з міні-менеджером."""
+    st.markdown("#### 🔗 Пов'язані замовлення")
+    rel_state_key = f"related_orders_{sfx}"
+    if rel_state_key not in st.session_state:
+        st.session_state[rel_state_key] = []
+
+    selected_rel: list[str] = list(st.session_state[rel_state_key])
+
+    # Відображення списку поточних пов'язаних замовлень з можливістю відкрити в редагуванні
+    if selected_rel:
+        st.caption("Натисніть на пов'язане замовлення, щоб відкрити його в режимі редагування:")
+        rel_cols = st.columns(min(len(selected_rel), 3))
+        for idx, item_label in enumerate(selected_rel):
+            oid_part = item_label.split("—")[0].strip() if "—" in item_label else item_label.strip()
+            with rel_cols[idx % len(rel_cols)]:
+                btn_c1, btn_c2 = st.columns([4, 1])
+                with btn_c1:
+                    if st.button(
+                        f"📄 {item_label}",
+                        key=f"open_rel_order_{sfx}_{idx}_{oid_part}",
+                        width="stretch",
+                    ):
+                        _open_related_order_in_edit(oid_part)
+                with btn_c2:
+                    if st.button(
+                        "✖",
+                        key=f"rm_rel_order_{sfx}_{idx}_{oid_part}",
+                        help="Прибрати зі зв'язаних",
+                    ):
+                        updated_list = [x for x in st.session_state[rel_state_key] if x != item_label]
+                        st.session_state[rel_state_key] = updated_list
+                        st.rerun()
+    else:
+        st.caption("Пов'язані замовлення ще не обрано.")
+
+    toggle_key = f"chk_add_related_orders_{sfx}"
+    add_rel_enabled = st.checkbox(
+        "Додати пов'язані замовлення",
+        value=st.session_state.get(toggle_key, False),
+        key=toggle_key,
+    )
+
+    if add_rel_enabled:
+        if all_orders_records is None:
+            all_orders_records = get_orders_data(selected_sheet_id, "Orders") or []
+
+        candidates = [
+            r for r in all_orders_records
+            if str(r.get("ID Замовлення", "")).strip()
+            and str(r.get("ID Замовлення", "")).strip() != current_order_id
+        ]
+
+        with st.container(border=True):
+            st.markdown("**🔎 Підбір пов'язаних замовлень**")
+            f_c1, f_c2, f_c3 = st.columns([1.5, 2, 2])
+            with f_c1:
+                rel_arch_mode = st.selectbox(
+                    "Архів",
+                    options=["Приховати архів", "Показати архів", "Лише архів"],
+                    index=0,
+                    key=f"rel_arch_{sfx}",
+                )
+            with f_c2:
+                rel_search = st.text_input(
+                    "Пошук (ID, назва, об'єкт)",
+                    key=f"rel_search_{sfx}",
+                ).strip().lower()
+            with f_c3:
+                rel_customers = sorted(
+                    {
+                        str(r.get("Замовник / Представник", "")).strip()
+                        for r in candidates
+                        if str(r.get("Замовник / Представник", "")).strip()
+                    }
+                )
+                rel_cust = st.selectbox(
+                    "Замовник",
+                    options=["Всі замовники"] + rel_customers,
+                    key=f"rel_cust_{sfx}",
+                )
+
+            filtered_rel = []
+            for r in candidates:
+                arch_flag = _is_archived_value(r.get("Архів", ""))
+                if rel_arch_mode == "Приховати архів" and arch_flag:
+                    continue
+                if rel_arch_mode == "Лише архів" and not arch_flag:
+                    continue
+                if rel_cust != "Всі замовники" and str(r.get("Замовник / Представник", "")).strip() != rel_cust:
+                    continue
+                if rel_search:
+                    blob = " ".join(
+                        str(r.get(k, ""))
+                        for k in ("ID Замовлення", "Назва замовлення", "Назва об'єкта", "Місто / Ort", "Замовник / Представник")
+                    ).lower()
+                    if rel_search not in blob:
+                        continue
+                filtered_rel.append(r)
+
+            if not filtered_rel:
+                st.info("За вказаними фільтрами замовлень не знайдено.")
+            else:
+                for r in filtered_rel[:25]:
+                    oid = str(r.get("ID Замовлення", "")).strip()
+                    oname = str(r.get("Назва замовлення", "")).strip()
+                    obj_name = str(r.get("Назва об'єкта", "")).strip()
+                    label = f"{oid} — {oname}" if oname else oid
+                    is_checked = label in st.session_state[rel_state_key]
+
+                    row_c1, row_c2 = st.columns([5, 1])
+                    with row_c1:
+                        checked_now = st.checkbox(
+                            f"**{label}** ({obj_name or 'без об\'єкта'})",
+                            value=is_checked,
+                            key=f"rel_chk_{sfx}_{oid}",
+                        )
+                        if checked_now and label not in st.session_state[rel_state_key]:
+                            st.session_state[rel_state_key].append(label)
+                            st.rerun()
+                        elif not checked_now and label in st.session_state[rel_state_key]:
+                            st.session_state[rel_state_key] = [
+                                x for x in st.session_state[rel_state_key] if x != label
+                            ]
+                            st.rerun()
+                    with row_c2:
+                        if st.button("✏️ Відкрити", key=f"rel_edit_btn_{sfx}_{oid}"):
+                            _open_related_order_in_edit(oid)
+
+    return st.session_state[rel_state_key]
+
 
 def _render_linked_persons_section(order_row: dict, all_contacts_records: list[dict], selected_sheet_id: str, sfx: str):
     """Активні кнопки пов'язаних осіб для переходу до картки контакту."""
-    st.markdown("#### 🔗 Пов'язані особи (натисніть для відкриття картки контакту)")
+    st.markdown("#### 👤 Пов'язані особи (натисніть для відкриття картки контакту)")
     st.caption("💡 Натисніть на особу, щоб відкрити форму редагування контакту.")
 
     role_fields = [
@@ -173,6 +332,7 @@ def render_order_form(
     order_data_to_edit: dict | None = None,
     key_suffix: str = "new",
     all_contacts_records: list[dict] | None = None,
+    all_orders_records: list[dict] | None = None,
     hierarchy: dict | None = None,
     on_success=None,
 ):
@@ -242,6 +402,13 @@ def render_order_form(
                 key=f"updated_at_{sfx}",
             )
 
+        st.text_input(
+            "Поточний статус",
+            value=str(order_row.get("Поточний статус", "Нове замовлення")),
+            disabled=True,
+            key=f"current_status_{sfx}",
+        )
+
     # Поле Архів — відображається в обох режимах
     is_archived_default = _is_archived_value(order_row.get("Архів", False)) if is_edit else False
     chk_archive = st.checkbox(
@@ -277,6 +444,13 @@ def render_order_form(
         height=125,
         key=f"order_content_{sfx}",
         label_visibility="collapsed",
+    )
+
+    related_orders_list = _render_related_orders_section(
+        selected_sheet_id=selected_sheet_id,
+        sfx=sfx,
+        current_order_id=order_id,
+        all_orders_records=all_orders_records,
     )
 
     st.markdown("---")
@@ -553,6 +727,7 @@ def render_order_form(
                         "Адреса": address,
                         "Назва замовлення": order_name,
                         "Суть/Зміст замовлення": order_content,
+                        "Пов'язані замовлення": ", ".join(related_orders_list),
                         "Тип замовлення": ", ".join(active_types),
                         "Замірник": measurer,
                         "Дизайнер": designer,
@@ -577,7 +752,8 @@ def render_order_form(
                             )
 
                         keys_to_clear = [
-                            f"chk_archive_{sfx}",
+                            f"chk_archive_{sfx}", f"chk_add_related_orders_{sfx}",
+                            f"related_orders_{sfx}",
                             f"order_name_{sfx}", f"order_content_{sfx}", f"address_{sfx}",
                             f"sel_country_{sfx}", f"sel_city_{sfx}", f"sel_object_{sfx}",
                             f"chk_m_{sfx}", f"chk_d_{sfx}", f"chk_c_{sfx}", f"chk_p_{sfx}",
@@ -609,10 +785,12 @@ def render_new_order_view(selected_sheet_id, drive_folder_id):
         st.balloons()
         st.session_state.order_success_msg = ""
 
+    all_orders_records = get_orders_data(selected_sheet_id, "Orders") or []
     sync_order_pickers_state(None, key_suffix="new", force=False)
     render_order_form(
         selected_sheet_id=selected_sheet_id,
         drive_folder_id=drive_folder_id,
         order_data_to_edit=None,
         key_suffix="new",
+        all_orders_records=all_orders_records,
     )
