@@ -185,6 +185,7 @@ def render_manager_orders_view(selected_sheet_id: str, drive_folder_id: str):
             if st.session_state.edit_order_id != selected_order_id:
                 st.session_state.edit_order_id = selected_order_id
                 st.session_state.active_linked_contact_label = None
+                st.query_params["edit_order"] = selected_order_id
                 sync_order_pickers_state(selected_order, key_suffix=f"edit_{selected_order_id}", force=True)
                 st.rerun()
     else:
@@ -204,6 +205,8 @@ def render_manager_orders_view(selected_sheet_id: str, drive_folder_id: str):
                 st.session_state.edit_order_id = None
                 st.session_state.active_linked_contact_label = None
                 st.session_state.orders_table_nonce = st.session_state.get("orders_table_nonce", 0) + 1
+                if "edit_order" in st.query_params:
+                    del st.query_params["edit_order"]
                 st.rerun()
 
             render_order_form(
@@ -212,6 +215,7 @@ def render_manager_orders_view(selected_sheet_id: str, drive_folder_id: str):
                 order_data_to_edit=target_order,
                 key_suffix="edit",
                 all_contacts_records=all_contacts_records,
+                all_orders_records=raw_orders,
                 hierarchy=hierarchy,
                 on_success=_on_edit_done,
             )
