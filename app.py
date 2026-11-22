@@ -61,10 +61,24 @@ else:
     selected_sheet_id = selected_db_info.get("sheet_id", "")
     drive_folder_id = selected_db_info.get("drive_folder_id", "")
 
+    # Якщо перейшли за посиланням з ?edit_order=ORD-...
+    qp_order_id = str(st.query_params.get("edit_order", "")).strip()
+    if qp_order_id and st.session_state.get("edit_order_id") != qp_order_id:
+        st.session_state.edit_order_id = qp_order_id
+        st.session_state.nav_menu = "📋 Актуальні замовлення"
+
+    menu_options = ["📋 Актуальні замовлення", "➕ Нове замовлення", "👥 Контакти"]
+    default_idx = 0
+    if st.session_state.get("nav_menu") in menu_options:
+        default_idx = menu_options.index(st.session_state["nav_menu"])
+
     menu = st.sidebar.radio(
         "Навігація",
-        ["📋 Актуальні замовлення", "➕ Нове замовлення", "👥 Контакти"],
+        menu_options,
+        index=default_idx,
+        key="sidebar_nav_radio",
     )
+    st.session_state.nav_menu = menu
 
     st.markdown(f"### Поточний напрямок: **{selected_db_name}**")
 
