@@ -98,6 +98,7 @@ def save_new_order(spreadsheet_id: str, order_data: dict) -> str:
 
             merged_data.update(order_data)
             merged_data["ID Замовлення"] = existing_id
+            merged_data["Поточний статус"] = ""
             merged_data["Час останнього редагування"] = order_data.get(
                 "Час останнього редагування", now_str
             )
@@ -119,13 +120,14 @@ def save_new_order(spreadsheet_id: str, order_data: dict) -> str:
 
         full_data = {
             "ID Замовлення": order_id,
-            "Поточний статус": "Нове замовлення",
+            "Поточний статус": "",
             "Архів": "",
             "Час створення": created_at,
             "Час останнього редагування": created_at,
         }
         full_data.update(order_data)
         full_data["ID Замовлення"] = order_id
+        full_data["Поточний статус"] = ""
 
         final_row = [str(full_data.get(h, "")) for h in headers]
         worksheet.append_row(final_row)
